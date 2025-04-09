@@ -4,6 +4,7 @@ from django.db import connections, DEFAULT_DB_ALIAS
 from django.test.utils import CaptureQueriesContext
 from sql_metadata.generalizator import Generalizator
 
+from .app_settings import GENERALIZED_DIFF
 from .engine import get_engine
 
 
@@ -16,7 +17,24 @@ def generalize_queries(captured_queries):
 
 
 def create_queries_diff(new_queries, old_queries, captured_queries):
-    diff_list = difflib.ndiff(old_queries, new_queries)
+    generalized_diff_list = difflib.ndiff(old_queries, new_queries)
+
+    if GENERALIZED_DIFF:
+        return "\n".join(generalized_diff_list)
+
+    idx = 0
+    diff_list = []
+
+    for line in generalized_diff_list:
+        if line.startswith("-"):
+            diff_list.append(line)
+        elif line.startswith("+"):
+            diff_list.append("+ " + captured_queries[idx]["sql"])
+            idx += 1
+        else:
+            diff_list.append("  " + captured_queries[idx]["sql"])
+            idx += 1
+
     return "\n".join(diff_list)
 
 
@@ -43,9 +61,7 @@ class _AssertNumNewQueriesContext(CaptureQueriesContext):
             self.test_case.assertEqual(
                 executed,
                 self.num,
-                "%d queries executed, %d expected\nQueries diff was:\n%s\n\nCaptured queries were:\n%s" %
-                (executed, self.num, queries_diff, "\n".join("%d. %s" % (i, query["sql"])
-                    for i, query in enumerate(self.captured_queries, start=1))),
+                "%d queries executed, %d expected\nQueries diff was:\n%s" % (executed, self.num, queries_diff),
             )
 
 
