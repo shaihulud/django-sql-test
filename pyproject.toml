@@ -1,6 +1,6 @@
 [project]
 name = "django-sql-test"
-version = "0.1.0"
+version = "0.1.1"
 description = "A Django test mixin that captures and displays SQL query diffs between test runs, helping to track database-related changes in your tests."
 authors = [
     {name = "Denis Zalivin",email = "zalivindenis@gmail.com"}
@@ -23,13 +23,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/shaihulud/django-sql-test"
-Issues = "https://github.com/shaihulud/django-sql-test/issues"
+homepage = "https://github.com/shaihulud/django-sql-test"
+repository = "https://github.com/shaihulud/django-sql-test"
+issues = "https://github.com/shaihulud/django-sql-test/issues"
 
 [tool.poetry]
-packages = [
-    { include = "src/django_sql_test" },
-]
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
