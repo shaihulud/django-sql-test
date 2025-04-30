@@ -1,20 +1,21 @@
 [project]
 name = "django-sql-test"
-version = "0.1.1"
+version = "0.2.0"
 description = "A Django test mixin that captures and displays SQL query diffs between test runs, helping to track database-related changes in your tests."
 authors = [
-    {name = "Denis Zalivin",email = "zalivindenis@gmail.com"}
+    {name = "Denis Zalivin", email = "zalivindenis@gmail.com"}
 ]
 license = {text = "MIT"}
 readme = "README.md"
 requires-python = "<4.0,>=3.9"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
     "Development Status :: 3 - Alpha",
     "Framework :: Django",
     "Framework :: Django :: 4",
     "Framework :: Django :: 5",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
     "Topic :: Software Development :: Testing",
 ]
 dependencies = [

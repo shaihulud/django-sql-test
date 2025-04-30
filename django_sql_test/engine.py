@@ -13,7 +13,7 @@ class Engine(abc.ABC):
         self.settings = settings or {}
 
     @abc.abstractmethod
-    def get_data_for_testcase(self, testcase: TransactionTestCase) -> list[str]: ...
+    def get_data_for_testcase(self, testcase: TransactionTestCase) -> list[dict]: ...
 
     @abc.abstractmethod
     def set_data_for_testcase(self, testcase: TransactionTestCase, captured_queries: list[dict]) -> None: ...
@@ -37,8 +37,9 @@ class FileEngine(Engine):
             except Exception:
                 self.data = {}
 
-    def get_data_for_testcase(self, testcase: TransactionTestCase) -> list[str]:
-        return self.data.get(str(testcase)) or []
+    def get_data_for_testcase(self, testcase: TransactionTestCase) -> list[dict]:
+        testcase_name = str(testcase)
+        return self.data.get(testcase_name) or []
 
     def set_data_for_testcase(self, testcase: TransactionTestCase, captured_queries: list[dict]) -> None:
         testcase_name = str(testcase)
