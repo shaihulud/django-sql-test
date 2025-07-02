@@ -1,6 +1,6 @@
 import unittest
 
-from django_sql_test.diff_utils import create_queries_diff
+from django_sql_test.diff_utils import create_queries_diff, default_color, new_color, old_color, reset_color
 
 
 class CreateQueriesDiffTestCase(unittest.TestCase):
@@ -12,8 +12,8 @@ class CreateQueriesDiffTestCase(unittest.TestCase):
 
     def test_empty_old_generalized_diff(self):
         expected_result = [
-            "SELECT a.a, a.b, a.c FROM a WHERE a.z = X AND a.m IN (XYZ)",
-            "SELECT b.a, b.b, b.c FROM b LIMIT N",
+            default_color + "SELECT a.a, a.b, a.c FROM a WHERE a.z = X AND a.m IN (XYZ)" + reset_color,
+            default_color + "SELECT b.a, b.b, b.c FROM b LIMIT N" + reset_color,
         ]
         result = create_queries_diff(
             new_captured_queries=self.new_captured_queries,
@@ -25,8 +25,8 @@ class CreateQueriesDiffTestCase(unittest.TestCase):
 
     def test_empty_old_regular_diff_shows_context(self):
         expected_result = [
-            "SELECT a.a, a.b, a.c FROM a WHERE a.z = '12' AND a.m IN (1, 2)",
-            "SELECT b.a, b.b, b.c FROM b LIMIT 21",
+            default_color + "  SELECT a.a, a.b, a.c FROM a WHERE a.z = '12' AND a.m IN (1, 2)" + reset_color,
+            default_color + "  SELECT b.a, b.b, b.c FROM b LIMIT 21" + reset_color,
         ]
         result = create_queries_diff(
             new_captured_queries=self.new_captured_queries,
@@ -47,8 +47,8 @@ class CreateQueriesDiffTestCase(unittest.TestCase):
 
     def test_nonempty_old_generalized_no_diff_only(self):
         expected_result = [
-            "  SELECT a.a, a.b, a.c FROM a WHERE a.z = X AND a.m IN (XYZ)",
-            "+ SELECT b.a, b.b, b.c FROM b LIMIT N",
+            default_color + "  SELECT a.a, a.b, a.c FROM a WHERE a.z = X AND a.m IN (XYZ)" + reset_color,
+            new_color + "+ SELECT b.a, b.b, b.c FROM b LIMIT N" + reset_color,
         ]
         result = create_queries_diff(
             new_captured_queries=self.new_captured_queries,
@@ -60,7 +60,7 @@ class CreateQueriesDiffTestCase(unittest.TestCase):
 
     def test_nonempty_old_generalized_diff_only(self):
         expected_result = [
-            "+ SELECT b.a, b.b, b.c FROM b LIMIT N",
+            new_color + "+ SELECT b.a, b.b, b.c FROM b LIMIT N" + reset_color,
         ]
         result = create_queries_diff(
             new_captured_queries=self.new_captured_queries,
@@ -72,8 +72,8 @@ class CreateQueriesDiffTestCase(unittest.TestCase):
 
     def test_nonempty_old_regular_diff(self):
         expected_result = [
-            "  SELECT a.a, a.b, a.c FROM a WHERE a.z = '12' AND a.m IN (1, 2)",
-            "+ SELECT b.a, b.b, b.c FROM b LIMIT 21",
+            default_color + "  SELECT a.a, a.b, a.c FROM a WHERE a.z = '12' AND a.m IN (1, 2)" + reset_color,
+            new_color + "+ SELECT b.a, b.b, b.c FROM b LIMIT 21" + reset_color,
         ]
         result = create_queries_diff(
             new_captured_queries=self.new_captured_queries,
@@ -85,7 +85,7 @@ class CreateQueriesDiffTestCase(unittest.TestCase):
 
     def test_nonempty_old_regular_diff_only(self):
         expected_result = [
-            "+ SELECT b.a, b.b, b.c FROM b LIMIT 21",
+            new_color + "+ SELECT b.a, b.b, b.c FROM b LIMIT 21" + reset_color,
         ]
         result = create_queries_diff(
             new_captured_queries=self.new_captured_queries,
@@ -97,8 +97,8 @@ class CreateQueriesDiffTestCase(unittest.TestCase):
 
     def test_question_lines_are_filtered(self):
         expected_result = [
-            "- SELECT b.a, b.b, b.c FROM b LIMIT N",  # TODO: fix this
-            "+ SELECT b.a, b.b, b.c, b.d FROM b LIMIT 21",
+            old_color + "- SELECT b.a, b.b, b.c FROM b LIMIT N" + reset_color,  # TODO: fix this
+            new_color + "+ SELECT b.a, b.b, b.c, b.d FROM b LIMIT 21" + reset_color,
         ]
         result = create_queries_diff(
             new_captured_queries=[{"sql": "SELECT b.a, b.b, b.c, b.d FROM b LIMIT 21"}],
@@ -115,4 +115,4 @@ class CreateQueriesDiffTestCase(unittest.TestCase):
             diff_only=False,
             generalized_diff=False,
         )
-        self.assertEqual(result, "- SELECT b.a, b.b, b.c FROM b LIMIT N")
+        self.assertEqual(result, old_color + "- SELECT b.a, b.b, b.c FROM b LIMIT N" + reset_color)
