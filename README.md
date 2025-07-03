@@ -110,7 +110,7 @@ If set, hides all unchanged SQL-queries.
 ### SQL_TEST_DIFF_DEFAULT_COLOR = "\033[0m"
 ### SQL_TEST_DIFF_NEW_COLOR = "\033[1;32m"
 ### SQL_TEST_DIFF_OLD_COLOR = "\033[1;31m"
-Sets colors for console diff. Git-style by default: red for old, green for new, and default console color for lines that haven't changed.
+Sets colors for console diffs. Uses Git-style coloring by default: red for removed SQL-queries, green for added SQL-queries, and the default console color for unchanged SQL-queries.
 
 ## API Reference
 
