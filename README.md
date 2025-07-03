@@ -87,10 +87,17 @@ Queries diff:
 
 Configure via your Django settings:
 
-### SQL_TEST_GENERALIZED_DIFF = True
-True by default.
+| Setting                        | Default        | Description                                                                                     |
+|--------------------------------|----------------|-------------------------------------------------------------------------------------------------|
+| `SQL_TEST_GENERALIZED_DIFF`    | `True`         | Hide SQL-query parameters replacing them with placeholders.                                     |
+| `SQL_TEST_DIFF_ONLY`           | `False`        | If set to True, shows only SQL-queries that were added or removed. Otherwise shows all queries. |
+| `SQL_TEST_DIFF_NEW_COLOR`      | `"\033[1;32m"` | Color for newly added SQL-queries (green).                                                      |
+| `SQL_TEST_DIFF_OLD_COLOR`      | `"\033[1;31m"` | Color for removed SQL-queries (red).                                                            |
+| `SQL_TEST_DIFF_DEFAULT_COLOR`  | `"\033[0m"`    | Base console color for unchanged SQL-queries.                                                   |
 
-If set to True, hides all SQL-query parameters replacing them with placeholders:
+### SQL_TEST_GENERALIZED_DIFF
+
+If set to True:
 ```diff
 Queries diff:
 + SELECT polls_choice.id FROM polls_choice WHERE polls_choice.votes >= N
@@ -102,24 +109,14 @@ Queries diff:
 + SELECT "polls_choice"."id" FROM "polls_choice" WHERE "polls_choice"."votes" >= 0
 ```
 
-### SQL_TEST_DIFF_ONLY = False
-False by default.
-
-If set, hides all unchanged SQL-queries.
-
-### SQL_TEST_DIFF_DEFAULT_COLOR = "\033[0m"
-### SQL_TEST_DIFF_NEW_COLOR = "\033[1;32m"
-### SQL_TEST_DIFF_OLD_COLOR = "\033[1;31m"
-Sets colors for console diffs. Uses Git-style coloring by default: red for removed SQL-queries, green for added SQL-queries, and the default console color for unchanged SQL-queries.
-
 ## API Reference
 
 ### `NumNewQueriesMixin`
 
-| Method                                | Description                                                                                                                                                                                                                                                                                          |
-| ------------------------------------- |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `assertNumNewQueries` | Works just like django.test.testcases.TransactionTestCase.assertNumQueries, but also prints the diff of queries compared to the last successful run, if any.                                                                                                                                         |
-| `assertNumQueries` | Acts like assertNumNewQueries. It can be used if you don’t want to replace every occurrence of assertNumQueries with assertNumNewQueries in your tests. Simply inherit from it in your test class, for example: class PaginatorsTestCase(NumNewQueriesMixin, ViewTestCase), and everything will work out of the box. |
+| Method                | Description                                                                                                                                                                                                                                                                                                          |
+|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `assertNumNewQueries` | Works just like django.test.testcases.TransactionTestCase.assertNumQueries, but also prints the diff of queries compared to the last successful run, if any.                                                                                                                                                         |
+| `assertNumQueries`    | Acts like assertNumNewQueries. It can be used if you don’t want to replace every occurrence of assertNumQueries with assertNumNewQueries in your tests. Simply inherit from it in your test class, for example: class PaginatorsTestCase(NumNewQueriesMixin, ViewTestCase), and everything will work out of the box. |
 
 ## Contributing
 
