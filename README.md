@@ -8,7 +8,7 @@ A Django test mixin that captures and analyzes SQL queries during tests, with bu
 <a href="https://pypi.org/project/django-sql-test/" target="_blank">
     <img src="https://img.shields.io/pypi/pyversions/django-sql-test.svg?color=%2334D058" alt="Supported Python versions">
 </a>
-<a href="https://pypi.org/project/django-sql-test/" target="_blank">
+<a href="https://github.com/shaihulud/django-sql-test/blob/main/LICENSE" target="_blank">
     <img src="https://img.shields.io/pypi/l/django-sql-test.svg?color=%2334D058" alt="License">
 </a>
 
@@ -25,8 +25,8 @@ A Django test mixin that captures and analyzes SQL queries during tests, with bu
 
 ## Requirements
 
-* Django >= 4.0
-* Python 3.9 and above.
+- Django >= 4.0  
+- Python >= 3.9
 
 ## Installation
 
@@ -44,7 +44,7 @@ from django_sql_test import NumNewQueriesMixin
 
 class FooTest(NumNewQueriesMixin, TestCase):
     def test_bar(self):
-        with self.assertNumQueries(2):
+        with self.assertNumNewQueries(2):
             response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 200)
@@ -68,15 +68,13 @@ Captured queries were:
 ```
 
 What you get after adding NumNewQueriesMixin:
-```shell
+```diff
 $ poetry run python manage.py test path.to.test.FooTest.test_bar
 ======================================================================
 FAIL: test_bar (path.to.test.FooTest.test_bar)
  ...
 AssertionError: 5 != 2 : 5 queries executed, 2 expected
 Queries diff:
-```
-```diff
 - SELECT polls_choice.id FROM polls_choice
 + SELECT polls_choice.id FROM polls_choice WHERE polls_choice.votes >= N
 + SELECT polls_question.id FROM polls_question WHERE polls_question.id = N LIMIT N
