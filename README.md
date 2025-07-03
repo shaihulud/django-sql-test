@@ -8,6 +8,9 @@ A Django test mixin that captures and analyzes SQL queries during tests, with bu
 <a href="https://pypi.org/project/django-sql-test/" target="_blank">
     <img src="https://img.shields.io/pypi/pyversions/django-sql-test.svg?color=%2334D058" alt="Supported Python versions">
 </a>
+<a href="https://pypi.org/project/django-sql-test/" target="_blank">
+    <img src="https://img.shields.io/pypi/l/django-sql-test.svg?color=%2334D058" alt="License">
+</a>
 
 ## Table of Contents
 
