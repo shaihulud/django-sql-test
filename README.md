@@ -87,7 +87,7 @@ Queries diff:
 
 Configure via your Django settings:
 
-#### SQL_TEST_GENERALIZED_DIFF = True
+### SQL_TEST_GENERALIZED_DIFF = True
 True by default.
 If set to True, hides all SQL-query parameters replacing them with placeholders:
 ```shell
@@ -101,13 +101,13 @@ Queries diff:
 + SELECT "polls_choice"."id" FROM "polls_choice" WHERE "polls_choice"."votes" >= 0
 ```
 
-#### SQL_TEST_DIFF_ONLY = False
+### SQL_TEST_DIFF_ONLY = False
 False by default.
 If set, hides all unchanged SQL-queries.
 
-#### SQL_TEST_DIFF_DEFAULT_COLOR = "\033[0m"
-#### SQL_TEST_DIFF_NEW_COLOR = "\033[1;32m"
-#### SQL_TEST_DIFF_OLD_COLOR = "\033[1;31m"
+### SQL_TEST_DIFF_DEFAULT_COLOR = "\033[0m"
+### SQL_TEST_DIFF_NEW_COLOR = "\033[1;32m"
+### SQL_TEST_DIFF_OLD_COLOR = "\033[1;31m"
 Sets colors for console diff. Git-style by default: red for old, green for new, and default console color for lines that haven't changed.
 
 ## API Reference
