@@ -83,6 +83,20 @@ Queries diff:
   SELECT COUNT(*) AS __count FROM polls_question
 ```
 
+---
+
+    ```shell
+    - SELECT ...
+    + SELECT ...
+    ```
+
+to:
+
+    ```diff
+    - SELECT ...
+    + SELECT ...
+    ```
+
 ## Configuration
 
 Configure via your Django settings:
