@@ -2,6 +2,13 @@
 
 A Django test mixin that captures and analyzes SQL queries during tests, with built-in support for displaying diffs between previous and current queries for spotting unexpected changes or regressions.
 
+<a href="https://pypi.org/project/django-sql-test/" target="_blank">
+    <img src="https://img.shields.io/pypi/v/django-sql-test?color=%2334D058&label=pypi%20package" alt="Package version">
+</a>
+<a href="https://pypi.org/project/django-sql-test/" target="_blank">
+    <img src="https://img.shields.io/pypi/pyversions/django-sql-test.svg?color=%2334D058" alt="Supported Python versions">
+</a>
+
 ## Table of Contents
 
 * [Requirements](#requirements)
