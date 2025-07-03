@@ -91,6 +91,7 @@ Configure via your Django settings:
 
 ### SQL_TEST_GENERALIZED_DIFF = True
 True by default.
+
 If set to True, hides all SQL-query parameters replacing them with placeholders:
 ```diff
 Queries diff:
@@ -105,6 +106,7 @@ Queries diff:
 
 ### SQL_TEST_DIFF_ONLY = False
 False by default.
+
 If set, hides all unchanged SQL-queries.
 
 ### SQL_TEST_DIFF_DEFAULT_COLOR = "\033[0m"
