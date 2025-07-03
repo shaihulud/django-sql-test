@@ -2,22 +2,29 @@
 
 A Django test mixin that captures and analyzes SQL queries during tests, with built-in support for displaying diffs between previous and current queries for spotting unexpected changes or regressions.
 
-## Usage
+## Table of Contents
 
-### Requirements
+* [Requirements](#requirements)
+* [Installation](#installation)
+* [Quickstart](#quickstart)
+* [Configuration](#configuration)
+* [API Reference](#api-reference)
+* [Contributing](#contributing)
+* [License](#license)
+* [Changelog](#changelog)
+
+## Requirements
 
 * Django >= 4.0
 * Python 3.9 and above.
 
-### Installation
-
-Install with:
+## Installation
 
 ```shell
 pip install django-sql-test
 ```
 
-### Quickstart
+## Quickstart
 
 In your test.py just import NumNewQueriesMixin and add it as a parent:
 
@@ -43,10 +50,10 @@ FAIL: test_bar (path.to.test.FooTest.test_bar)
   ...
 AssertionError: 5 != 2 : 5 queries executed, 2 expected
 Captured queries were:
-1. SELECT "polls_choice"."id", "polls_choice"."question_id", "polls_choice"."choice_text", "polls_choice"."votes" FROM "polls_choice" WHERE "polls_choice"."votes" >= 0
-2. SELECT "polls_question"."id", "polls_question"."question_text", "polls_question"."pub_date" FROM "polls_question" WHERE "polls_question"."id" = 1 LIMIT 21
-3. SELECT "polls_question"."id", "polls_question"."question_text", "polls_question"."pub_date" FROM "polls_question" WHERE "polls_question"."id" = 1 LIMIT 21
-4. SELECT "polls_question"."id", "polls_question"."question_text", "polls_question"."pub_date" FROM "polls_question" WHERE "polls_question"."id" = 1 LIMIT 21
+1. SELECT "polls_choice"."id" FROM "polls_choice" WHERE "polls_choice"."votes" >= 0
+2. SELECT "polls_question"."id" FROM "polls_question" WHERE "polls_question"."id" = 1 LIMIT 21
+3. SELECT "polls_question"."id" FROM "polls_question" WHERE "polls_question"."id" = 1 LIMIT 21
+4. SELECT "polls_question"."id" FROM "polls_question" WHERE "polls_question"."id" = 1 LIMIT 21
 5. SELECT COUNT(*) AS "__count" FROM "polls_question"
 ```
 
@@ -58,15 +65,18 @@ FAIL: test_bar (path.to.test.FooTest.test_bar)
  ...
 AssertionError: 5 != 2 : 5 queries executed, 2 expected
 Queries diff:
-- SELECT polls_choice.id, polls_choice.question_id, polls_choice.choice_text, polls_choice.votes FROM polls_choice
-+ SELECT polls_choice.id, polls_choice.question_id, polls_choice.choice_text, polls_choice.votes FROM polls_choice WHERE polls_choice.votes >= N
-+ SELECT polls_question.id, polls_question.question_text, polls_question.pub_date FROM polls_question WHERE polls_question.id = N LIMIT N
-+ SELECT polls_question.id, polls_question.question_text, polls_question.pub_date FROM polls_question WHERE polls_question.id = N LIMIT N
-+ SELECT polls_question.id, polls_question.question_text, polls_question.pub_date FROM polls_question WHERE polls_question.id = N LIMIT N
+- SELECT polls_choice.id FROM polls_choice
++ SELECT polls_choice.id FROM polls_choice WHERE polls_choice.votes >= N
++ SELECT polls_question.id FROM polls_question WHERE polls_question.id = N LIMIT N
++ SELECT polls_question.id FROM polls_question WHERE polls_question.id = N LIMIT N
++ SELECT polls_question.id FROM polls_question WHERE polls_question.id = N LIMIT N
   SELECT COUNT(*) AS __count FROM polls_question
 ```
 
-### Settings
+## Configuration
+
+Configure via your Django settings:
+
 #### SQL_TEST_GENERALIZED_DIFF = True
 True by default.
 If set to True, hides all SQL-query parameters replacing them with placeholders:
@@ -89,3 +99,35 @@ If set, hides all unchanged SQL-queries.
 #### SQL_TEST_DIFF_NEW_COLOR = "\033[1;32m"
 #### SQL_TEST_DIFF_OLD_COLOR = "\033[1;31m"
 Sets colors for console diff. Git-style by default: red for old, green for new, and default console color for lines that haven't changed.
+
+## API Reference
+
+### `NumNewQueriesMixin`
+
+| Method                                | Description                                                                                                                                                                                                                                                                                          |
+| ------------------------------------- |------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `assertNumNewQueries` | Works just like django.test.testcases.TransactionTestCase.assertNumQueries, but also prints the diff of queries compared to the last successful run, if any.                                                                                                                                         |
+| `assertNumQueries` | Acts like assertNumNewQueries. It can be used if you don’t want to replace every occurrence of assertNumQueries with assertNumNewQueries in your tests. Simply inherit from it in your test class, for example: class PaginatorsTestCase(NumNewQueriesMixin, ViewTestCase), and everything will work out of the box. |
+
+## Contributing
+
+We welcome contributions! Please:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/YourFeature`)
+3. Write tests and ensure coverage
+4. Run and pass:
+    ```shell
+    poetry run isort -c --diff --settings-file pyproject.toml .
+    poetry run black --diff --config pyproject.toml --check .
+    poetry run python runtests.py
+    ```
+5. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+## Changelog
+
+All notable changes are documented on the [Releases page](https://github.com/shaihulud/django-sql-test/releases).
