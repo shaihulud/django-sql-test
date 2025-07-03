@@ -75,6 +75,8 @@ FAIL: test_bar (path.to.test.FooTest.test_bar)
  ...
 AssertionError: 5 != 2 : 5 queries executed, 2 expected
 Queries diff:
+```
+```diff
 - SELECT polls_choice.id FROM polls_choice
 + SELECT polls_choice.id FROM polls_choice WHERE polls_choice.votes >= N
 + SELECT polls_question.id FROM polls_question WHERE polls_question.id = N LIMIT N
@@ -83,20 +85,6 @@ Queries diff:
   SELECT COUNT(*) AS __count FROM polls_question
 ```
 
----
-
- ```shell
- - SELECT ...
- + SELECT ...
- ```
-
-to:
-
- ```diff
- - SELECT ...
- + SELECT ...
- ```
-
 ## Configuration
 
 Configure via your Django settings:
@@ -104,13 +92,13 @@ Configure via your Django settings:
 ### SQL_TEST_GENERALIZED_DIFF = True
 True by default.
 If set to True, hides all SQL-query parameters replacing them with placeholders:
-```shell
+```diff
 Queries diff:
 + SELECT polls_choice.id FROM polls_choice WHERE polls_choice.votes >= N
 ```
 
 If set to False:
-```shell
+```diff
 Queries diff:
 + SELECT "polls_choice"."id" FROM "polls_choice" WHERE "polls_choice"."votes" >= 0
 ```
