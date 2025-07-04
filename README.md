@@ -1,7 +1,5 @@
 # django-sql-test
 
-A Django test mixin that captures and analyzes SQL queries during tests, with built-in support for displaying diffs between previous and current queries for spotting unexpected changes or regressions.
-
 <a href="https://pypi.org/project/django-sql-test/" target="_blank">
     <img src="https://img.shields.io/pypi/v/django-sql-test?color=%2334D058&label=pypi%20package" alt="Package version">
 </a>
@@ -11,6 +9,24 @@ A Django test mixin that captures and analyzes SQL queries during tests, with bu
 <a href="https://github.com/shaihulud/django-sql-test/blob/main/LICENSE" target="_blank">
     <img src="https://img.shields.io/pypi/l/django-sql-test.svg?color=%2334D058" alt="License">
 </a>
+
+Prevent SQL regressions, detect N+1 queries, and visualize query diffs in your Django tests.
+A test mixin that captures, snapshots, and diffs all executed SQL queries in your test output.
+
+```diff
+$ poetry run python manage.py test path.to.test.FooTest.test_bar
+======================================================================
+FAIL: test_bar (path.to.test.FooTest.test_bar)
+ ...
+AssertionError: 5 != 2 : 5 queries executed, 2 expected
+Queries diff:
+- SELECT polls_choice.id FROM polls_choice
++ SELECT polls_choice.id FROM polls_choice WHERE polls_choice.votes >= N
++ SELECT polls_question.id FROM polls_question WHERE polls_question.id = N LIMIT N
++ SELECT polls_question.id FROM polls_question WHERE polls_question.id = N LIMIT N
++ SELECT polls_question.id FROM polls_question WHERE polls_question.id = N LIMIT N
+  SELECT COUNT(*) AS __count FROM polls_question
+```
 
 ## Table of Contents
 
