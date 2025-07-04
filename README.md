@@ -1,5 +1,8 @@
 # django-sql-test
 
+Prevent SQL regressions, detect N+1 queries, and visualize query diffs in your Django tests.
+A test mixin that captures, snapshots, and diffs all executed SQL queries in your test output.
+
 <a href="https://pypi.org/project/django-sql-test/" target="_blank">
     <img src="https://img.shields.io/pypi/v/django-sql-test?color=%2334D058&label=pypi%20package" alt="Package version">
 </a>
@@ -9,9 +12,6 @@
 <a href="https://github.com/shaihulud/django-sql-test/blob/main/LICENSE" target="_blank">
     <img src="https://img.shields.io/pypi/l/django-sql-test.svg?color=%2334D058" alt="License">
 </a>
-
-Prevent SQL regressions, detect N+1 queries, and visualize query diffs in your Django tests.
-A test mixin that captures, snapshots, and diffs all executed SQL queries in your test output.
 
 ```diff
 $ poetry run python manage.py test path.to.test.FooTest.test_bar
