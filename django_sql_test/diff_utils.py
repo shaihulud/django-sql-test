@@ -27,7 +27,8 @@ def create_queries_diff(
     old_captured_queries: list[dict],
     diff_only: bool,
     generalized_diff: bool,
-) -> str:
+) -> tuple[str, bool]:
+    is_same = True
     new_queries = generalize_queries(get_raw_queries(new_captured_queries))
     old_queries = generalize_queries(get_raw_queries(old_captured_queries))
 
@@ -44,21 +45,25 @@ def create_queries_diff(
 
         for line in generalized_diff_list:
             if line.startswith("-"):
+                is_same = False
                 diff_list.append(old_color + line + reset_color)
             elif line.startswith("+"):
+                is_same = False
                 diff_list.append(new_color + line + reset_color)
             else:
                 diff_list.append(default_color + line + reset_color)
 
-        return "\n".join(diff_list)
+        return "\n".join(diff_list), is_same
 
     idx = 0
     diff_list = []
 
     for line in generalized_diff_list:
         if line.startswith("-"):
+            is_same = False
             diff_list.append(old_color + line + reset_color)
         elif line.startswith("+"):
+            is_same = False
             diff_list.append(new_color + "+ " + new_captured_queries[idx]["sql"] + reset_color)
             idx += 1
         else:
@@ -66,4 +71,4 @@ def create_queries_diff(
                 diff_list.append(default_color + "  " + new_captured_queries[idx]["sql"] + reset_color)
             idx += 1
 
-    return "\n".join(diff_list)
+    return "\n".join(diff_list), is_same
