@@ -28,6 +28,9 @@ class DiffLine:
     original_query: str
     generalized_query: str
 
+    def get_query(self, is_generalized: bool) -> str:
+        return self.generalized_query if is_generalized else self.original_query
+
 
 def get_raw_queries(captured_queries: list[dict]) -> list[str]:
     return [query["sql"] for query in captured_queries]
@@ -84,41 +87,18 @@ def create_queries_diff(
     is_same = True
     queries_diff_list = build_queries_diff_list(new_captured_queries, old_captured_queries)
 
-    old_queries = 1
-    generalized_diff_list = queries_diff_list
-
-    if generalized_diff:
-        if diff_only and old_queries:
-            generalized_diff_list = (i for i in generalized_diff_list if i.startswith("+") or i.startswith("-"))
-
-        diff_list = []
-
-        for line in generalized_diff_list:
-            if line.startswith("-"):
-                is_same = False
-                diff_list.append(old_color + line + reset_color)
-            elif line.startswith("+"):
-                is_same = False
-                diff_list.append(new_color + line + reset_color)
-            else:
-                diff_list.append(default_color + line + reset_color)
-
-        return "\n".join(diff_list), is_same
-
-    idx = 0
     diff_list = []
+    for diff_line in queries_diff_list:
+        query = diff_line.get_query(generalized_diff)
 
-    for line in generalized_diff_list:
-        if line.startswith("-"):
+        if diff_line.diff_type == DiffType.REMOVED:
             is_same = False
-            diff_list.append(old_color + line + reset_color)
-        elif line.startswith("+"):
+            diff_list.append(old_color + query + reset_color)
+        elif diff_line.diff_type == DiffType.ADDED:
             is_same = False
-            diff_list.append(new_color + "+ " + new_captured_queries[idx]["sql"] + reset_color)
-            idx += 1
-        else:
+            diff_list.append(new_color + query + reset_color)
+        else:  # DiffType.UNCHANGED
             if not diff_only:
-                diff_list.append(default_color + "  " + new_captured_queries[idx]["sql"] + reset_color)
-            idx += 1
+                diff_list.append(default_color + query + reset_color)
 
     return "\n".join(diff_list), is_same
