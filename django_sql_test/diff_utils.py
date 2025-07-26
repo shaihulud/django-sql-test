@@ -4,17 +4,6 @@ from enum import Enum
 
 from sql_metadata.generalizator import Generalizator
 
-from .app_settings import DIFF_DEFAULT_COLOR, DIFF_NEW_COLOR, DIFF_OLD_COLOR
-
-
-red_color = "\033[1;31m"
-green_color = "\033[1;32m"
-reset_color = "\033[0m"
-
-old_color = DIFF_OLD_COLOR or red_color
-new_color = DIFF_NEW_COLOR or green_color
-default_color = DIFF_DEFAULT_COLOR or reset_color
-
 
 class DiffType(Enum):
     ADDED = "+"
@@ -30,6 +19,22 @@ class DiffLine:
 
     def get_query(self, is_generalized: bool) -> str:
         return self.generalized_query if is_generalized else self.original_query
+
+
+class ColorScheme:
+    red_color = "\033[1;31m"
+    green_color = "\033[1;32m"
+    reset = "\033[0m"
+
+    def __init__(self, added: str, removed: str, unchanged: str):
+        self.color_map = {
+            DiffType.ADDED: added or self.red_color,
+            DiffType.REMOVED: removed or self.green_color,
+            DiffType.UNCHANGED: unchanged or self.reset,
+        }
+
+    def get_color(self, diff_type: DiffType) -> str:
+        return self.color_map.get(diff_type) or self.reset
 
 
 def get_raw_queries(captured_queries: list[dict]) -> list[str]:
@@ -78,27 +83,33 @@ def build_queries_diff_list(new_captured_queries: list[dict], old_captured_queri
     return queries_diff_list
 
 
-def create_queries_diff(
-    new_captured_queries: list[dict],
-    old_captured_queries: list[dict],
-    diff_only: bool,
-    generalized_diff: bool,
-) -> tuple[str, bool]:
-    is_same = True
-    queries_diff_list = build_queries_diff_list(new_captured_queries, old_captured_queries)
+@dataclass
+class QueryDiffBuilder:
+    new_captured_queries: list[dict]
+    old_captured_queries: list[dict]
+    color_scheme: None | ColorScheme
 
-    diff_list = []
-    for diff_line in queries_diff_list:
-        query = diff_line.get_query(generalized_diff)
+    def __post_init__(self):
+        self.queries_diff_list = build_queries_diff_list(self.new_captured_queries, self.old_captured_queries)
 
-        if diff_line.diff_type == DiffType.REMOVED:
-            is_same = False
-            diff_list.append(old_color + query + reset_color)
-        elif diff_line.diff_type == DiffType.ADDED:
-            is_same = False
-            diff_list.append(new_color + query + reset_color)
-        else:  # DiffType.UNCHANGED
-            if not diff_only:
-                diff_list.append(default_color + query + reset_color)
+        self.is_same = True
+        for diff_line in self.queries_diff_list:
+            if diff_line.diff_type != DiffType.UNCHANGED:
+                self.is_same = False
+                break
 
-    return "\n".join(diff_list), is_same
+    def build_queries_diff(self, show_diff_only: bool, generalized_diff: bool) -> str:
+        diff_list = []
+        for diff_line in self.queries_diff_list:
+            if show_diff_only and diff_line.diff_type == DiffType.UNCHANGED:
+                continue
+
+            query = diff_line.get_query(generalized_diff)
+
+            if self.color_scheme:
+                color = self.color_scheme.get_color(diff_line.diff_type)
+                query = f"{color}{query}{self.color_scheme.reset}"
+
+            diff_list.append(query)
+
+        return "\n".join(diff_list)
