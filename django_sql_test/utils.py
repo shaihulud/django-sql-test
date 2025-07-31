@@ -15,7 +15,7 @@ from .diff_utils import ColorScheme, QueryDiffBuilder
 from .engine import get_engine
 
 
-color_scheme = ColorScheme(DIFF_NEW_COLOR, DIFF_OLD_COLOR, DIFF_DEFAULT_COLOR)
+color_scheme = ColorScheme(added=DIFF_NEW_COLOR, removed=DIFF_OLD_COLOR, unchanged=DIFF_DEFAULT_COLOR)
 
 
 class _AssertNumNewQueriesContext(CaptureQueriesContext):
@@ -33,7 +33,7 @@ class _AssertNumNewQueriesContext(CaptureQueriesContext):
         engine = get_engine()
 
         if executed == self.num:
-            if GENERALIZED_DIFF and SHOW_UPDATED_QUERIES:
+            if SHOW_UPDATED_QUERIES:
                 old_captured_queries = engine.get_data_for_testcase(self.test_case)
                 builder = QueryDiffBuilder(self.captured_queries, old_captured_queries, color_scheme)
 
