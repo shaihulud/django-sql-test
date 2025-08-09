@@ -1,11 +1,19 @@
 import abc
 import json
 import os
+from unittest.util import strclass
 
 from django.test.testcases import TransactionTestCase
 from django.utils.module_loading import import_string
 
 from .app_settings import ENGINE, ENGINE_SETTINGS
+
+
+def get_testcase_name(testcase: TransactionTestCase, call_index: int) -> str:
+    class_name = strclass(testcase.__class__)
+    method_name = getattr(testcase, "_testMethodName", "unknown_test")
+    testcase_name = f"{class_name}.{method_name}:{call_index}"
+    return testcase_name
 
 
 class Engine(abc.ABC):
@@ -40,13 +48,13 @@ class FileEngine(Engine):
                 self.data = {}
 
     def get_data_for_testcase(self, testcase: TransactionTestCase, call_index: int = 0) -> list[dict]:
-        testcase_name = f"{testcase}:{call_index}"
+        testcase_name = get_testcase_name(testcase, call_index)
         return self.data.get(testcase_name) or []
 
     def set_data_for_testcase(
         self, testcase: TransactionTestCase, captured_queries: list[dict], call_index: int = 0
     ) -> None:
-        testcase_name = f"{testcase}:{call_index}"
+        testcase_name = get_testcase_name(testcase, call_index)
         self.data[testcase_name] = captured_queries
 
         with open(self.filename, "w") as f:

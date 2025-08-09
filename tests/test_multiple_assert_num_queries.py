@@ -193,8 +193,16 @@ class FileEngineCallIndexTestCase(TestCase):
 
             # Mock test case
             class MockTestCase:
-                def __str__(self):
-                    return "test_method (tests.TestClass)"
+                def __init__(self):
+                    self._testMethodName = "test_method"
+
+                @property
+                def __class__(self):
+                    class MockClass:
+                        __module__ = "tests"
+                        __qualname__ = "TestClass"
+
+                    return MockClass
 
             test_case = MockTestCase()
 
@@ -226,8 +234,16 @@ class FileEngineCallIndexTestCase(TestCase):
             engine = FileEngine({"filename": temp_filename})
 
             class MockTestCase:
-                def __str__(self):
-                    return "test_method (tests.TestClass)"
+                def __init__(self):
+                    self._testMethodName = "test_method"
+
+                @property
+                def __class__(self):
+                    class MockClass:
+                        __module__ = "tests"
+                        __qualname__ = "TestClass"
+
+                    return MockClass
 
             test_case = MockTestCase()
             queries = [{"sql": "SELECT 1"}]
@@ -238,7 +254,7 @@ class FileEngineCallIndexTestCase(TestCase):
             with open(temp_filename, "r") as f:
                 data = json.load(f)
 
-            expected_key = "test_method (tests.TestClass):2"
+            expected_key = "tests.TestClass.test_method:2"
             self.assertIn(expected_key, data)
             self.assertEqual(data[expected_key], queries)
 
@@ -255,8 +271,16 @@ class FileEngineCallIndexTestCase(TestCase):
             engine = FileEngine({"filename": temp_filename})
 
             class MockTestCase:
-                def __str__(self):
-                    return "test_method (tests.TestClass)"
+                def __init__(self):
+                    self._testMethodName = "test_method"
+
+                @property
+                def __class__(self):
+                    class MockClass:
+                        __module__ = "tests"
+                        __qualname__ = "TestClass"
+
+                    return MockClass
 
             test_case = MockTestCase()
 
