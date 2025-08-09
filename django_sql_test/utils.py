@@ -1,3 +1,4 @@
+import inspect
 import sys
 
 from django.db import connections, DEFAULT_DB_ALIAS
@@ -19,9 +20,10 @@ color_scheme = ColorScheme(added=DIFF_NEW_COLOR, removed=DIFF_OLD_COLOR, unchang
 
 
 class _AssertNumNewQueriesContext(CaptureQueriesContext):
-    def __init__(self, test_case, num, connection):
+    def __init__(self, test_case, num, connection, call_index):
         self.test_case = test_case
         self.num = num
+        self.call_index = call_index
         super().__init__(connection)
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -34,7 +36,7 @@ class _AssertNumNewQueriesContext(CaptureQueriesContext):
 
         if executed == self.num:
             if SHOW_UPDATED_QUERIES:
-                old_captured_queries = engine.get_data_for_testcase(self.test_case)
+                old_captured_queries = engine.get_data_for_testcase(self.test_case, self.call_index)
                 builder = QueryDiffBuilder(self.captured_queries, old_captured_queries, color_scheme)
 
                 if not builder.is_same:
@@ -42,9 +44,9 @@ class _AssertNumNewQueriesContext(CaptureQueriesContext):
                     sys.stdout.write(
                         f"executed queries number is the same, but queries differ\nQueries diff:\n{queries_diff}\n"
                     )
-            engine.set_data_for_testcase(self.test_case, self.captured_queries)
+            engine.set_data_for_testcase(self.test_case, self.captured_queries, self.call_index)
         else:
-            old_captured_queries = engine.get_data_for_testcase(self.test_case)
+            old_captured_queries = engine.get_data_for_testcase(self.test_case, self.call_index)
             builder = QueryDiffBuilder(self.captured_queries, old_captured_queries, color_scheme)
             queries_diff = builder.build_queries_diff(DIFF_ONLY, GENERALIZED_DIFF)
             self.test_case.assertEqual(
@@ -55,10 +57,45 @@ class _AssertNumNewQueriesContext(CaptureQueriesContext):
 
 
 class NumNewQueriesMixin:
+    def _get_call_index(self):
+        # Get the current test method name
+        current_frame = inspect.currentframe()
+        try:
+            # Go up the stack to find the test method
+            frame = current_frame.f_back.f_back  # Skip _get_call_index and assertNumQueries
+            while frame:
+                code_name = frame.f_code.co_name
+                if code_name.startswith("test_") or code_name in ["setUp", "tearDown"]:
+                    break
+                frame = frame.f_back
+
+            if frame:
+                test_method_name = frame.f_code.co_name
+            else:
+                test_method_name = "unknown_test"
+        finally:
+            del current_frame
+
+        # Initialize call tracking for this test method if not exists
+        if not hasattr(self, "_query_call_counters"):
+            self._query_call_counters = {}
+            self._current_test_method = None
+
+        # Reset counter if we're in a new test method
+        if self._current_test_method != test_method_name:
+            self._current_test_method = test_method_name
+            self._query_call_counters[test_method_name] = 0
+
+        call_index = self._query_call_counters[test_method_name]
+        self._query_call_counters[test_method_name] += 1
+
+        return call_index
+
     def assertNumQueries(self, num, func=None, *args, using=DEFAULT_DB_ALIAS, **kwargs):
         conn = connections[using]
+        call_index = self._get_call_index()
 
-        context = _AssertNumNewQueriesContext(self, num, conn)
+        context = _AssertNumNewQueriesContext(self, num, conn, call_index)
         if func is None:
             return context
 

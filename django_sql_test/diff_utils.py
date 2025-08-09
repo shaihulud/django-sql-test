@@ -87,7 +87,7 @@ def build_queries_diff_list(new_captured_queries: list[dict], old_captured_queri
 class QueryDiffBuilder:
     new_captured_queries: list[dict]
     old_captured_queries: list[dict]
-    color_scheme: None | ColorScheme
+    color_scheme: None | ColorScheme = None
 
     def __post_init__(self):
         self.queries_diff_list = build_queries_diff_list(self.new_captured_queries, self.old_captured_queries)
@@ -98,13 +98,13 @@ class QueryDiffBuilder:
                 self.is_same = False
                 break
 
-    def build_queries_diff(self, show_diff_only: bool, generalized_diff: bool) -> str:
+    def build_queries_diff(self, show_diff_only: bool, show_generalized_diff: bool) -> str:
         diff_list = []
         for diff_line in self.queries_diff_list:
             if show_diff_only and diff_line.diff_type == DiffType.UNCHANGED:
                 continue
 
-            query = diff_line.get_query(generalized_diff)
+            query = diff_line.get_query(show_generalized_diff)
 
             if self.color_scheme:
                 color = self.color_scheme.get_color(diff_line.diff_type)

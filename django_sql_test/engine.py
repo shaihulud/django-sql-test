@@ -13,10 +13,12 @@ class Engine(abc.ABC):
         self.settings = settings or {}
 
     @abc.abstractmethod
-    def get_data_for_testcase(self, testcase: TransactionTestCase) -> list[dict]: ...
+    def get_data_for_testcase(self, testcase: TransactionTestCase, call_index: int = 0) -> list[dict]: ...
 
     @abc.abstractmethod
-    def set_data_for_testcase(self, testcase: TransactionTestCase, captured_queries: list[dict]) -> None: ...
+    def set_data_for_testcase(
+        self, testcase: TransactionTestCase, captured_queries: list[dict], call_index: int = 0
+    ) -> None: ...
 
 
 class FileEngine(Engine):
@@ -37,12 +39,14 @@ class FileEngine(Engine):
             except Exception:
                 self.data = {}
 
-    def get_data_for_testcase(self, testcase: TransactionTestCase) -> list[dict]:
-        testcase_name = str(testcase)
+    def get_data_for_testcase(self, testcase: TransactionTestCase, call_index: int = 0) -> list[dict]:
+        testcase_name = f"{testcase}:{call_index}"
         return self.data.get(testcase_name) or []
 
-    def set_data_for_testcase(self, testcase: TransactionTestCase, captured_queries: list[dict]) -> None:
-        testcase_name = str(testcase)
+    def set_data_for_testcase(
+        self, testcase: TransactionTestCase, captured_queries: list[dict], call_index: int = 0
+    ) -> None:
+        testcase_name = f"{testcase}:{call_index}"
         self.data[testcase_name] = captured_queries
 
         with open(self.filename, "w") as f:
