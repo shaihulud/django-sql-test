@@ -1,4 +1,3 @@
-import inspect
 import sys
 
 from django.db import connections, DEFAULT_DB_ALIAS
@@ -58,36 +57,17 @@ class _AssertNumNewQueriesContext(CaptureQueriesContext):
 
 class NumNewQueriesMixin:
     def _get_call_index(self):
-        # Get the current test method name
-        current_frame = inspect.currentframe()
-        try:
-            # Go up the stack to find the test method
-            frame = current_frame.f_back.f_back  # Skip _get_call_index and assertNumQueries
-            while frame:
-                code_name = frame.f_code.co_name
-                if code_name.startswith("test_") or code_name in ["setUp", "tearDown"]:
-                    break
-                frame = frame.f_back
+        current_test_method = getattr(self, "_testMethodName", "unknown_test")
 
-            if frame:
-                test_method_name = frame.f_code.co_name
-            else:
-                test_method_name = "unknown_test"
-        finally:
-            del current_frame
+        if not hasattr(self, "_query_call_data"):
+            self._query_call_data = {"current_method": current_test_method, "counter": 0}
 
-        # Initialize call tracking for this test method if not exists
-        if not hasattr(self, "_query_call_counters"):
-            self._query_call_counters = {}
-            self._current_test_method = None
+        if self._query_call_data["current_method"] != current_test_method:
+            self._query_call_data["current_method"] = current_test_method
+            self._query_call_data["counter"] = 0
 
-        # Reset counter if we're in a new test method
-        if self._current_test_method != test_method_name:
-            self._current_test_method = test_method_name
-            self._query_call_counters[test_method_name] = 0
-
-        call_index = self._query_call_counters[test_method_name]
-        self._query_call_counters[test_method_name] += 1
+        call_index = self._query_call_data["counter"]
+        self._query_call_data["counter"] += 1
 
         return call_index
 
