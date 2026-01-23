@@ -175,4 +175,5 @@ cython_debug/
 .claude/
 .idea
 .django_sql_test_queries
+CLAUDE.md
 Makefile
