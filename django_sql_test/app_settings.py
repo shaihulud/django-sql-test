@@ -9,3 +9,9 @@ DIFF_NEW_COLOR = getattr(settings, "SQL_TEST_DIFF_NEW_COLOR", None)
 DIFF_OLD_COLOR = getattr(settings, "SQL_TEST_DIFF_OLD_COLOR", None)
 DIFF_DEFAULT_COLOR = getattr(settings, "SQL_TEST_DIFF_DEFAULT_COLOR", None)
 SHOW_UPDATED_QUERIES = getattr(settings, "SQL_TEST_SHOW_UPDATED_QUERIES", False)
+
+# N+1 query detection settings
+DETECT_N_PLUS_ONE = getattr(settings, "SQL_TEST_DETECT_N_PLUS_ONE", True)
+N_PLUS_ONE_SEVERITY_THRESHOLD = getattr(
+    settings, "SQL_TEST_N_PLUS_ONE_SEVERITY_THRESHOLD", "medium"
+)  # low, medium, high

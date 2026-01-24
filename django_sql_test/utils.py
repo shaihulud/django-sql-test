@@ -4,15 +4,18 @@ from django.db import connections, DEFAULT_DB_ALIAS
 from django.test.utils import CaptureQueriesContext
 
 from .app_settings import (
+    DETECT_N_PLUS_ONE,
     DIFF_DEFAULT_COLOR,
     DIFF_NEW_COLOR,
     DIFF_OLD_COLOR,
     DIFF_ONLY,
     GENERALIZED_DIFF,
+    N_PLUS_ONE_SEVERITY_THRESHOLD,
     SHOW_UPDATED_QUERIES,
 )
 from .diff_utils import ColorScheme, QueryDiffBuilder
 from .engine import get_engine
+from .n_plus_one import analyze_queries, filter_by_severity, print_problems
 
 
 color_scheme = ColorScheme(added=DIFF_NEW_COLOR, removed=DIFF_OLD_COLOR, unchanged=DIFF_DEFAULT_COLOR)
@@ -43,16 +46,33 @@ class _AssertNumNewQueriesContext(CaptureQueriesContext):
                     sys.stdout.write(
                         f"executed queries number is the same, but queries differ\nQueries diff:\n{queries_diff}\n"
                     )
+
+            # Analyze for N+1 problems if enabled
+            if DETECT_N_PLUS_ONE:
+                self._analyze_n_plus_one(self.captured_queries)
+
             engine.set_data_for_testcase(self.test_case, self.captured_queries, self.call_index)
         else:
             old_captured_queries = engine.get_data_for_testcase(self.test_case, self.call_index)
             builder = QueryDiffBuilder(self.captured_queries, old_captured_queries, color_scheme)
             queries_diff = builder.build_queries_diff(DIFF_ONLY, GENERALIZED_DIFF)
+
+            # Analyze for N+1 problems if enabled
+            if DETECT_N_PLUS_ONE:
+                self._analyze_n_plus_one(self.captured_queries)
+
             self.test_case.assertEqual(
                 executed,
                 self.num,
                 "%d queries executed, %d expected\nQueries diff:\n%s" % (executed, self.num, queries_diff),
             )
+
+    @staticmethod
+    def _analyze_n_plus_one(captured_queries):
+        """Analyze queries for N+1 problems and output warnings."""
+        problems = filter_by_severity(analyze_queries(captured_queries), N_PLUS_ONE_SEVERITY_THRESHOLD)
+        if problems:
+            print_problems(problems)
 
 
 class NumNewQueriesMixin:
