@@ -1,6 +1,7 @@
 import difflib
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 
 from sql_metadata.generalizator import Generalizator
 
@@ -87,7 +88,7 @@ def build_queries_diff_list(new_captured_queries: list[dict], old_captured_queri
 class QueryDiffBuilder:
     new_captured_queries: list[dict]
     old_captured_queries: list[dict]
-    color_scheme: None | ColorScheme = None
+    color_scheme: Optional[ColorScheme] = None
 
     def __post_init__(self):
         self.queries_diff_list = build_queries_diff_list(self.new_captured_queries, self.old_captured_queries)
