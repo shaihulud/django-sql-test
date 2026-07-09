@@ -29,8 +29,8 @@ class ColorScheme:
 
     def __init__(self, added: str, removed: str, unchanged: str):
         self.color_map = {
-            DiffType.ADDED: added or self.red_color,
-            DiffType.REMOVED: removed or self.green_color,
+            DiffType.ADDED: added or self.green_color,
+            DiffType.REMOVED: removed or self.red_color,
             DiffType.UNCHANGED: unchanged or self.reset,
         }
 
