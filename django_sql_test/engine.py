@@ -49,12 +49,17 @@ class FileEngine(Engine):
 
     def get_data_for_testcase(self, testcase: TransactionTestCase, call_index: int = 0) -> list[dict]:
         testcase_name = get_testcase_name(testcase, call_index)
-        return self.data.get(testcase_name) or []
+        data = self.data.get(testcase_name)
+        if data is None and call_index == 0:
+            # Snapshots written before 1.0 are keyed by str(testcase) and have no call_index
+            data = self.data.get(str(testcase))
+        return data or []
 
     def set_data_for_testcase(
         self, testcase: TransactionTestCase, captured_queries: list[dict], call_index: int = 0
     ) -> None:
         testcase_name = get_testcase_name(testcase, call_index)
+        self.data.pop(str(testcase), None)  # migrate away the pre-1.0 entry, if any
         self.data[testcase_name] = captured_queries
 
         with open(self.filename, "w") as f:

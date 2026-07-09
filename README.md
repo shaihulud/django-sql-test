@@ -114,6 +114,16 @@ Configure via your Django settings:
 | `SQL_TEST_ENGINE`               | `"file"`       | Engine used to store the last successful SQL queries. Default `"file"` engine stores data in the file from `SQL_TEST_ENGINE_SETTINGS["filename"]`, or in `.django_sql_test_queries` at the project root if not set. You can implement a custom engine by inheriting from `django_sql_test.engine.Engine`, overriding its methods, and specifying its full path, e.g., `SQL_TEST_ENGINE = "path.to.YourEngine".` |
 | `SQL_TEST_ENGINE_SETTINGS`      | `{}`           | Dictionary of settings passed to the engine's constructor. For the default `"file"` engine, you can pass the path to the file where queries will be stored in JSON format.                                                                                                                                                                                                                                      |
 
+### Upgrading from 0.x
+
+Version 1.0 supports multiple `assertNumQueries` calls per test method, which required two breaking changes:
+
+- **Custom engines**: `Engine.get_data_for_testcase` and `Engine.set_data_for_testcase` now take an additional
+  `call_index: int = 0` parameter. Add it to your subclass's method signatures.
+- **Snapshot file format**: stored queries are now keyed by `<module>.<Class>.<method>:<call_index>` instead of
+  `str(testcase)`. The built-in `"file"` engine still reads old-format entries and migrates them to the new format
+  automatically on the next successful run, so no action is needed.
+
 ### SQL_TEST_GENERALIZED_DIFF
 
 If set to True:
