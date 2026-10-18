@@ -2,6 +2,7 @@
 N+1 query problem detection for Django SQL queries.
 """
 
+import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -10,6 +11,11 @@ from typing import Dict, List, Literal, Optional
 from sql_metadata import Parser
 from sql_metadata.generalizator import Generalizator
 
+
+# sql_metadata generalization placeholders: N (numbers), X/XX (strings, e.g. UUID keys), s (%s-style params).
+# Case-sensitive on purpose. IN (XYZ) is deliberately excluded: repeated IN queries are usually
+# prefetch_related batches, i.e. the fix for N+1 rather than the problem.
+PARAM_PLACEHOLDER = re.compile(r"= (?:N|X+|s)\b")
 
 Severity = Literal["low", "medium", "high"]
 SEVERITY_LEVELS: Dict[Severity, int] = {"low": 1, "medium": 2, "high": 3}
@@ -94,9 +100,8 @@ def analyze_queries(queries: List[dict]) -> List[N1Problem]:
         if base_table == "unknown":
             base_table = None
 
-        # N+1 indicator: WHERE clause with parameter (typical FK lookup)
-        pattern_upper = pattern.upper()
-        if "WHERE" not in pattern_upper or "= N" not in pattern_upper:
+        # N+1 indicator: WHERE clause with a parameter placeholder (typical FK lookup)
+        if "WHERE" not in pattern.upper() or not PARAM_PLACEHOLDER.search(pattern):
             continue
 
         count = len(group_queries)

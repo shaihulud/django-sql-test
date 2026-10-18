@@ -124,6 +124,11 @@ Version 1.0 supports multiple `assertNumQueries` calls per test method, which re
   `str(testcase)`. The built-in `"file"` engine still reads old-format entries and migrates them to the new format
   automatically on the next successful run, so no action is needed.
 
+Note that `call_index` is the position of the `assertNumQueries` call within the test method. Keep the number and
+order of calls per test stable: adding, removing, or conditionally executing a call shifts the indices of all
+subsequent calls, so their snapshots are compared against the wrong baseline until the next successful run
+rewrites them.
+
 ### SQL_TEST_GENERALIZED_DIFF
 
 If set to True:

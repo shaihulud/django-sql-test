@@ -54,12 +54,12 @@ class Command(BaseCommand):
 
         # Get all stored data
         try:
-            if hasattr(engine, "data"):
-                all_data = engine.data
-            else:
-                raise CommandError("Engine does not support direct data access for analysis")
-        except Exception as e:
-            raise CommandError(f"Failed to retrieve test data: {e}")
+            all_data = engine.get_all_data()
+        except NotImplementedError:
+            raise CommandError(
+                f"Engine {engine.__class__.__name__} does not support bulk data access. "
+                "Implement get_all_data() on your engine to use this command."
+            )
 
         if not all_data:
             self.stdout.write(self.style_warning("No test data found. Run some tests first."))
@@ -153,7 +153,7 @@ class Command(BaseCommand):
                 "count": problem.count,
                 "pattern": problem.pattern,
                 "base_table": problem.base_table,
-                "joined_table": problem.joined_table,
+                "joined_tables": problem.joined_tables,
                 "example_queries": [q.get("sql", "") for q in problem.similar_queries[:3]],
             }
             for problem in problems

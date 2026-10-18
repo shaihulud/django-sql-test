@@ -115,6 +115,19 @@ class N1AnalyzerTestCase(unittest.TestCase):
         if high_problems:
             self.assertEqual(high_problems[0].severity, "high")
 
+    def test_detect_n1_with_string_parameters(self):
+        """Test detection of N+1 pattern with non-numeric (UUID/string) keys."""
+        queries = [
+            {"sql": f"SELECT * FROM orders WHERE user_uuid = '{value}'"}
+            for value in ("a1b2c3d4", "b2c3d4e5", "c3d4e5f6", "d4e5f6a1", "e5f6a1b2")
+        ]
+
+        problems = analyze_queries(queries)
+
+        self.assertEqual(len(problems), 1)
+        self.assertEqual(problems[0].count, 5)
+        self.assertEqual(problems[0].base_table, "orders")
+
     def test_ignore_identical_queries(self):
         """Test that identical queries (not N+1) are ignored."""
         queries = [

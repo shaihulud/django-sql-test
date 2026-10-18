@@ -28,6 +28,13 @@ class Engine(abc.ABC):
         self, testcase: TransactionTestCase, captured_queries: list[dict], call_index: int = 0
     ) -> None: ...
 
+    def get_all_data(self) -> dict:
+        """
+        Return all stored queries as {testcase_name: captured_queries}.
+        Only needed by the analyze_n_plus_one management command.
+        """
+        raise NotImplementedError
+
 
 class FileEngine(Engine):
     def __init__(self, *args, **kwargs):
@@ -64,6 +71,9 @@ class FileEngine(Engine):
 
         with open(self.filename, "w") as f:
             f.write(json.dumps(self.data))
+
+    def get_all_data(self) -> dict:
+        return self.data
 
 
 def get_engine() -> Engine:
