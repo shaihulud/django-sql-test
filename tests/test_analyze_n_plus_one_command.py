@@ -37,16 +37,30 @@ class AnalyzeNPlusOneCommandTestCase(TestCase):
         engine = self._make_engine_with_n1_data()
 
         stdout = StringIO()
+        stderr = StringIO()
         with patch("django_sql_test.management.commands.analyze_n_plus_one.get_engine", return_value=engine):
-            call_command("analyze_n_plus_one", "--format", "json", stdout=stdout)
+            call_command("analyze_n_plus_one", "--format", "json", stdout=stdout, stderr=stderr)
 
-        output = stdout.getvalue()
-        # Skip the styled "Analyzing..." line preceding the JSON payload
-        problems = json.loads(output[output.index("[\n") :])
+        # stdout must be valid JSON on its own (e.g. pipeable to `jq`); status messages go to stderr.
+        problems = json.loads(stdout.getvalue())
         self.assertEqual(len(problems), 1)
         self.assertEqual(problems[0]["test_case"], "tests.TestClass.test_method:0")
         self.assertEqual(problems[0]["count"], 5)
         self.assertIn("joined_tables", problems[0])
+
+    def test_json_output_is_empty_array_when_no_data(self):
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as temp_file:
+            temp_filename = temp_file.name
+        self.addCleanup(os.unlink, temp_filename)
+        with open(temp_filename, "w") as f:
+            json.dump({}, f)
+        engine = FileEngine({"filename": temp_filename})
+
+        stdout = StringIO()
+        with patch("django_sql_test.management.commands.analyze_n_plus_one.get_engine", return_value=engine):
+            call_command("analyze_n_plus_one", "--format", "json", stdout=stdout, stderr=StringIO())
+
+        self.assertEqual(json.loads(stdout.getvalue()), [])
 
     def test_engine_without_bulk_access_raises_command_error(self):
         with patch(

@@ -45,7 +45,8 @@ class Command(BaseCommand):
         detailed = options["detailed"]
         output_format = options["format"]
 
-        self.stdout.write(self.style_info("Analyzing stored test queries for N+1 problems..."))
+        # Status/diagnostic messages go to stderr so stdout stays parseable when --format json is used.
+        self.stderr.write(self.style_info("Analyzing stored test queries for N+1 problems..."))
 
         try:
             engine = get_engine()
@@ -62,7 +63,7 @@ class Command(BaseCommand):
             )
 
         if not all_data:
-            self.stdout.write(self.style_warning("No test data found. Run some tests first."))
+            self._report_empty("No test data found. Run some tests first.", output_format)
             return
 
         # Filter by test pattern if provided
@@ -70,7 +71,7 @@ class Command(BaseCommand):
             all_data = {k: v for k, v in all_data.items() if test_pattern.lower() in k.lower()}
 
         if not all_data:
-            self.stdout.write(self.style_warning(f"No test data matches pattern '{test_pattern}'"))
+            self._report_empty(f"No test data matches pattern '{test_pattern}'", output_format)
             return
 
         # Analyze each test case
@@ -83,15 +84,15 @@ class Command(BaseCommand):
                 all_problems.append(problem)
 
         if not all_problems:
-            self.stdout.write(self.style_success("No N+1 problems detected!"))
+            self._report_empty("No N+1 problems detected!", output_format, success=True)
             return
 
         # Filter by severity and sort
         filtered_problems = filter_by_severity(all_problems, severity_threshold)
 
         if not filtered_problems:
-            self.stdout.write(
-                self.style_success(f"No N+1 problems found at '{severity_threshold}' severity or higher!")
+            self._report_empty(
+                f"No N+1 problems found at '{severity_threshold}' severity or higher!", output_format, success=True
             )
             return
 
@@ -103,6 +104,13 @@ class Command(BaseCommand):
             self._output_json(top_problems)
         else:
             self._output_text(top_problems, detailed)
+
+    def _report_empty(self, message, output_format, success=False):
+        """Report an early-exit status. JSON stays machine-parseable; the message always goes to stderr."""
+        if output_format == "json":
+            self.stdout.write("[]")
+        style = self.style_success if success else self.style_warning
+        self.stderr.write(style(message))
 
     def _output_text(self, problems, detailed):
         """Output problems in human-readable text format."""

@@ -34,6 +34,7 @@ Queries diff:
 * [Installation](#installation)
 * [Quickstart](#quickstart)
 * [Configuration](#configuration)
+* [N+1 Query Detection](#n1-query-detection)
 * [API Reference](#api-reference)
 * [Contributing](#contributing)
 * [License](#license)
@@ -113,6 +114,8 @@ Configure via your Django settings:
 | `SQL_TEST_SHOW_UPDATED_QUERIES` | `False`        | When set to True, SQL query diffs will be displayed even if the number of executed queries matches the expected count. The test will not fail; the diff is printed once and then overwritten.                                                                                                                                                                                                                   |
 | `SQL_TEST_ENGINE`               | `"file"`       | Engine used to store the last successful SQL queries. Default `"file"` engine stores data in the file from `SQL_TEST_ENGINE_SETTINGS["filename"]`, or in `.django_sql_test_queries` at the project root if not set. You can implement a custom engine by inheriting from `django_sql_test.engine.Engine`, overriding its methods, and specifying its full path, e.g., `SQL_TEST_ENGINE = "path.to.YourEngine".` |
 | `SQL_TEST_ENGINE_SETTINGS`      | `{}`           | Dictionary of settings passed to the engine's constructor. For the default `"file"` engine, you can pass the path to the file where queries will be stored in JSON format.                                                                                                                                                                                                                                      |
+| `SQL_TEST_DETECT_N_PLUS_ONE`    | `False`        | If set to True, warns about potential N+1 query patterns in the captured queries every time `assertNumQueries` runs. See [N+1 Query Detection](#n1-query-detection).                                                                                                                                                                                                                                           |
+| `SQL_TEST_N_PLUS_ONE_SEVERITY_THRESHOLD` | `"medium"` | Minimum severity (`"low"`, `"medium"`, or `"high"`) a detected N+1 pattern must reach to be reported.                                                                                                                                                                                                                                                                                                  |
 
 ### Upgrading from 0.x
 
@@ -142,6 +145,49 @@ If set to False:
 Queries diff:
 + SELECT "polls_choice"."id" FROM "polls_choice" WHERE "polls_choice"."votes" >= 0
 ```
+
+## N+1 Query Detection
+
+With `SQL_TEST_DETECT_N_PLUS_ONE` set to `True`, every `assertNumQueries` call scans its captured queries for
+repeated query patterns against different parameters (a common sign of an N+1 problem) and prints a warning with
+the offending pattern, affected table, severity, and suggestions — without failing the test:
+
+```
+============================================================
+POTENTIAL N+1 QUERY PROBLEMS DETECTED
+============================================================
+
+1. N+1 Problem: 5 similar queries on polls_choice
+   Severity: MEDIUM
+   Pattern: SELECT polls_choice.id FROM polls_choice WHERE polls_choice.question_id = N
+
+SUGGESTIONS:
+   1. Use prefetch_related() to fetch related polls_choice objects in batches
+   2. Review if all these queries are necessary
+============================================================
+```
+
+Only patterns at or above `SQL_TEST_N_PLUS_ONE_SEVERITY_THRESHOLD` are reported.
+
+### `analyze_n_plus_one` management command
+
+Queries saved by the `"file"` engine (or any custom engine implementing `get_all_data()`) can also be analyzed in
+bulk, across all previously recorded test cases:
+
+```shell
+poetry run python manage.py analyze_n_plus_one
+```
+
+| Option           | Description                                                                 |
+|------------------|-------------------------------------------------------------------------------|
+| `--severity`     | Minimum severity to report: `low`, `medium`, or `high` (default: `medium`).   |
+| `--test-pattern` | Only analyze test cases whose stored key contains this substring.             |
+| `--top`          | Show at most this many problems, worst first (default: `10`).                |
+| `--detailed`     | Include all example queries for each problem, not just a few.                 |
+| `--format`       | `text` (default) or `json`. With `--format json`, stdout is valid JSON (status messages go to stderr), so it can be piped straight into tools like `jq`. |
+
+Custom engines must implement `get_all_data()` (returning `{testcase_name: captured_queries}`) to be usable with
+this command; otherwise it raises a `CommandError`.
 
 ## API Reference
 
