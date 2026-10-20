@@ -15,10 +15,15 @@ from .app_settings import (
 )
 from .diff_utils import ColorScheme, QueryDiffBuilder
 from .engine import get_engine
-from .n_plus_one import analyze_queries, filter_by_severity, print_problems
+from .n_plus_one import analyze_queries, filter_by_severity, print_problems, Severity
 
 
 color_scheme = ColorScheme(added=DIFF_NEW_COLOR, removed=DIFF_OLD_COLOR, unchanged=DIFF_DEFAULT_COLOR)
+
+if DETECT_N_PLUS_ONE:
+    # Only validated when the feature is actually on: fail fast on an invalid threshold, but don't block
+    # startup over a stale/typo'd setting that's never going to be read while detection is disabled.
+    N_PLUS_ONE_SEVERITY_THRESHOLD = Severity.parse(N_PLUS_ONE_SEVERITY_THRESHOLD)
 
 
 class _AssertNumNewQueriesContext(CaptureQueriesContext):

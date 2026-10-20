@@ -3,11 +3,13 @@ import unittest
 from django_sql_test.n_plus_one import (
     analyze_queries,
     analyze_queries_for_n1,
+    filter_by_severity,
     generalize,
     get_suggestions,
     get_tables,
     N1Analyzer,
     N1Problem,
+    Severity,
 )
 
 
@@ -93,7 +95,7 @@ class N1AnalyzerTestCase(unittest.TestCase):
         self.assertEqual(len(problems), 1)
         problem = problems[0]
         self.assertEqual(problem.count, 5)
-        self.assertEqual(problem.severity, "medium")  # 5 queries = medium severity
+        self.assertEqual(problem.severity, Severity.MEDIUM)  # 5 queries = medium severity
 
     def test_severity_calculation(self):
         """Test severity calculation based on query count."""
@@ -101,19 +103,19 @@ class N1AnalyzerTestCase(unittest.TestCase):
         low_queries = [{"sql": f"SELECT * FROM users WHERE id = {i}"} for i in range(1, 4)]
         low_problems = analyze_queries(low_queries)
         if low_problems:
-            self.assertEqual(low_problems[0].severity, "low")
+            self.assertEqual(low_problems[0].severity, Severity.LOW)
 
         # Medium severity (5-9 queries)
         medium_queries = [{"sql": f"SELECT * FROM users WHERE id = {i}"} for i in range(1, 8)]
         medium_problems = analyze_queries(medium_queries)
         if medium_problems:
-            self.assertEqual(medium_problems[0].severity, "medium")
+            self.assertEqual(medium_problems[0].severity, Severity.MEDIUM)
 
         # High severity (10+ queries)
         high_queries = [{"sql": f"SELECT * FROM users WHERE id = {i}"} for i in range(1, 12)]
         high_problems = analyze_queries(high_queries)
         if high_problems:
-            self.assertEqual(high_problems[0].severity, "high")
+            self.assertEqual(high_problems[0].severity, Severity.HIGH)
 
     def test_detect_n1_with_string_parameters(self):
         """Test detection of N+1 pattern with non-numeric (UUID/string) keys."""
@@ -255,7 +257,7 @@ class N1ProblemTestCase(unittest.TestCase):
             count=5,
             similar_queries=[],
             base_table="users",
-            severity="medium",
+            severity=Severity.MEDIUM,
         )
 
         str_repr = str(problem)
@@ -269,3 +271,42 @@ class N1ProblemTestCase(unittest.TestCase):
 
         str_repr = str(problem)
         self.assertIn("unknown table", str_repr)
+
+
+class SeverityParseTestCase(unittest.TestCase):
+    """Severity.parse() accepts a name or a Severity member - int is deliberately not supported (YAGNI)."""
+
+    def test_parses_name_case_insensitively(self):
+        self.assertEqual(Severity.parse("medium"), Severity.MEDIUM)
+        self.assertEqual(Severity.parse("HIGH"), Severity.HIGH)
+        self.assertEqual(Severity.parse("Low"), Severity.LOW)
+
+    def test_passes_through_severity_member(self):
+        self.assertEqual(Severity.parse(Severity.HIGH), Severity.HIGH)
+
+    def test_invalid_name_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            Severity.parse("meduim")  # typo
+
+    def test_int_raises_type_error(self):
+        with self.assertRaises(TypeError):
+            Severity.parse(2)
+
+    def test_invalid_type_raises_type_error(self):
+        with self.assertRaises(TypeError):
+            Severity.parse(None)
+
+
+class FilterBySeverityThresholdTestCase(unittest.TestCase):
+    def setUp(self):
+        self.problems = [
+            N1Problem(pattern="p", count=3, severity=Severity.LOW),
+            N1Problem(pattern="p", count=5, severity=Severity.MEDIUM),
+            N1Problem(pattern="p", count=10, severity=Severity.HIGH),
+        ]
+
+    def test_threshold_as_name(self):
+        self.assertEqual(len(filter_by_severity(self.problems, "high")), 1)
+
+    def test_threshold_as_member(self):
+        self.assertEqual(len(filter_by_severity(self.problems, Severity.MEDIUM)), 2)

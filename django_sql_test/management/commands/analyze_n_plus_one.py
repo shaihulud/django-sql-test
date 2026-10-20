@@ -9,7 +9,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils.termcolors import make_style
 
 from django_sql_test.engine import get_engine
-from django_sql_test.n_plus_one import analyze_queries, filter_by_severity, get_suggestions, SEVERITY_LEVELS
+from django_sql_test.n_plus_one import analyze_queries, filter_by_severity, get_suggestions, Severity
 
 
 class Command(BaseCommand):
@@ -39,7 +39,10 @@ class Command(BaseCommand):
         self.style_info = make_style(fg="cyan")
 
     def handle(self, *args, **options):
-        severity_threshold = options["severity"]
+        try:
+            severity_threshold = Severity.parse(options["severity"])
+        except (TypeError, ValueError) as e:
+            raise CommandError(str(e))
         test_pattern = options.get("test_pattern")
         top_n = options["top"]
         detailed = options["detailed"]
@@ -92,11 +95,13 @@ class Command(BaseCommand):
 
         if not filtered_problems:
             self._report_empty(
-                f"No N+1 problems found at '{severity_threshold}' severity or higher!", output_format, success=True
+                f"No N+1 problems found at '{severity_threshold.name.lower()}' severity or higher!",
+                output_format,
+                success=True,
             )
             return
 
-        filtered_problems.sort(key=lambda p: (SEVERITY_LEVELS.get(p.severity, 1), p.count), reverse=True)
+        filtered_problems.sort(key=lambda p: (p.severity, p.count), reverse=True)
         top_problems = filtered_problems[:top_n]
 
         # Output results
@@ -116,11 +121,15 @@ class Command(BaseCommand):
         """Output problems in human-readable text format."""
         self.stdout.write(self.style_error(f"\nFound {len(problems)} N+1 query problems:\n"))
 
-        severity_style = {"high": self.style_error, "medium": self.style_warning, "low": self.style_info}
+        severity_style = {
+            Severity.HIGH: self.style_error,
+            Severity.MEDIUM: self.style_warning,
+            Severity.LOW: self.style_info,
+        }
 
         for i, problem in enumerate(problems, 1):
             style = severity_style.get(problem.severity, self.style_info)
-            self.stdout.write(f"\n{i}. {style(problem.severity.upper())} - {problem}")
+            self.stdout.write(f"\n{i}. {style(problem.severity.name)} - {problem}")
             self.stdout.write(f"   Test: {problem.test_case or 'Unknown'}")
 
             pattern = problem.pattern if detailed or len(problem.pattern) <= 80 else f"{problem.pattern[:77]}..."
@@ -147,17 +156,17 @@ class Command(BaseCommand):
             severity_counts[problem.severity] += 1
 
         self.stdout.write("\nSummary:")
-        for severity in ["high", "medium", "low"]:
+        for severity in (Severity.HIGH, Severity.MEDIUM, Severity.LOW):
             if severity_counts[severity]:
                 style = severity_style[severity]
-                self.stdout.write(f"   {style(severity.capitalize())}: {severity_counts[severity]} problems")
+                self.stdout.write(f"   {style(severity.name.capitalize())}: {severity_counts[severity]} problems")
 
     def _output_json(self, problems):
         """Output problems in JSON format."""
         json_data = [
             {
                 "test_case": problem.test_case or "Unknown",
-                "severity": problem.severity,
+                "severity": problem.severity.name.lower(),
                 "count": problem.count,
                 "pattern": problem.pattern,
                 "base_table": problem.base_table,

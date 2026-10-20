@@ -6,7 +6,8 @@ import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Literal, Optional
+from enum import IntEnum
+from typing import Dict, List, Optional, Union
 
 from sql_metadata import Parser
 from sql_metadata.generalizator import Generalizator
@@ -17,8 +18,25 @@ from sql_metadata.generalizator import Generalizator
 # prefetch_related batches, i.e. the fix for N+1 rather than the problem.
 PARAM_PLACEHOLDER = re.compile(r"= (?:N|X+|s)\b")
 
-Severity = Literal["low", "medium", "high"]
-SEVERITY_LEVELS: Dict[Severity, int] = {"low": 1, "medium": 2, "high": 3}
+
+class Severity(IntEnum):
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
+
+    @classmethod
+    def parse(cls, value: Union["Severity", str]) -> "Severity":
+        """Accept a Severity or its name ("low"/"medium"/"high", case-insensitive)."""
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, str):
+            try:
+                return cls[value.upper()]
+            except KeyError:
+                valid = ", ".join(s.name.lower() for s in cls)
+                raise ValueError(f"Invalid N+1 severity {value!r}; expected one of {valid}") from None
+        raise TypeError(f"N+1 severity must be a str or Severity, got {type(value).__name__}")
+
 
 HIGH_SEVERITY_THRESHOLD = 10
 MEDIUM_SEVERITY_THRESHOLD = 5
@@ -26,10 +44,10 @@ MEDIUM_SEVERITY_THRESHOLD = 5
 
 def _calculate_severity(count: int) -> Severity:
     if count >= HIGH_SEVERITY_THRESHOLD:
-        return "high"
+        return Severity.HIGH
     if count >= MEDIUM_SEVERITY_THRESHOLD:
-        return "medium"
-    return "low"
+        return Severity.MEDIUM
+    return Severity.LOW
 
 
 def _truncate(s: str, max_len: int) -> str:
@@ -46,7 +64,7 @@ class N1Problem:
     similar_queries: List[dict] = field(default_factory=list)
     base_table: Optional[str] = None
     joined_tables: Optional[List[str]] = None
-    severity: Severity = "medium"
+    severity: Severity = Severity.MEDIUM
     test_case: Optional[str] = None
 
     def __str__(self):
@@ -117,7 +135,7 @@ def analyze_queries(queries: List[dict]) -> List[N1Problem]:
             )
         )
 
-    problems.sort(key=lambda p: (SEVERITY_LEVELS[p.severity], p.count), reverse=True)
+    problems.sort(key=lambda p: (p.severity, p.count), reverse=True)
     return problems
 
 
@@ -133,10 +151,10 @@ def get_suggestions(problem: N1Problem) -> List[str]:
     return suggestions
 
 
-def filter_by_severity(problems: List[N1Problem], threshold: Severity = "medium") -> List[N1Problem]:
-    """Filter problems by minimum severity threshold."""
-    threshold_level = SEVERITY_LEVELS.get(threshold, 2)
-    return [p for p in problems if SEVERITY_LEVELS.get(p.severity, 1) >= threshold_level]
+def filter_by_severity(problems: List[N1Problem], threshold: Union[Severity, str] = Severity.MEDIUM) -> List[N1Problem]:
+    """Filter problems by minimum severity threshold. Accepts a Severity or its name."""
+    threshold = Severity.parse(threshold)
+    return [p for p in problems if p.severity >= threshold]
 
 
 def format_problems_text(problems: List[N1Problem], detailed: bool = False) -> str:
@@ -153,7 +171,7 @@ def format_problems_text(problems: List[N1Problem], detailed: bool = False) -> s
 
     for i, problem in enumerate(problems, 1):
         lines.append(f"\n{i}. {problem}")
-        lines.append(f"   Severity: {problem.severity.upper()}")
+        lines.append(f"   Severity: {problem.severity.name}")
         if problem.test_case:
             lines.append(f"   Test: {problem.test_case}")
 
