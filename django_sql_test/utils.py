@@ -41,6 +41,10 @@ class _AssertNumNewQueriesContext(CaptureQueriesContext):
         executed = len(self)
         engine = get_engine()
 
+        # Analyze for N+1 problems if enabled - same call regardless of whether the count matched.
+        if DETECT_N_PLUS_ONE:
+            self._analyze_n_plus_one(self.captured_queries)
+
         if executed == self.num:
             if SHOW_UPDATED_QUERIES:
                 old_captured_queries = engine.get_data_for_testcase(self.test_case, self.call_index)
@@ -52,19 +56,11 @@ class _AssertNumNewQueriesContext(CaptureQueriesContext):
                         f"executed queries number is the same, but queries differ\nQueries diff:\n{queries_diff}\n"
                     )
 
-            # Analyze for N+1 problems if enabled
-            if DETECT_N_PLUS_ONE:
-                self._analyze_n_plus_one(self.captured_queries)
-
             engine.set_data_for_testcase(self.test_case, self.captured_queries, self.call_index)
         else:
             old_captured_queries = engine.get_data_for_testcase(self.test_case, self.call_index)
             builder = QueryDiffBuilder(self.captured_queries, old_captured_queries, color_scheme)
             queries_diff = builder.build_queries_diff(DIFF_ONLY, GENERALIZED_DIFF)
-
-            # Analyze for N+1 problems if enabled
-            if DETECT_N_PLUS_ONE:
-                self._analyze_n_plus_one(self.captured_queries)
 
             self.test_case.assertEqual(
                 executed,
