@@ -62,6 +62,30 @@ class AnalyzeNPlusOneCommandTestCase(TestCase):
 
         self.assertEqual(json.loads(stdout.getvalue()), [])
 
+    def test_text_output_reports_true_total_when_top_truncates(self):
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as temp_file:
+            temp_filename = temp_file.name
+        self.addCleanup(os.unlink, temp_filename)
+
+        # 15 distinct N+1 problems, all at MEDIUM severity
+        data = {
+            f"tests.T.test_{t}:0": [{"sql": f"SELECT * FROM table_{t} WHERE user_id = {i}"} for i in range(5)]
+            for t in range(15)
+        }
+        with open(temp_filename, "w") as f:
+            json.dump(data, f)
+        engine = FileEngine({"filename": temp_filename})
+
+        stdout = StringIO()
+        with patch("django_sql_test.management.commands.analyze_n_plus_one.get_engine", return_value=engine):
+            call_command("analyze_n_plus_one", stdout=stdout, stderr=StringIO())  # default --top 10
+
+        output = stdout.getvalue()
+        self.assertIn("Found 15 N+1 query problems", output)
+        self.assertIn("showing top 10", output)
+        self.assertIn("Medium", output)
+        self.assertIn(": 15 problems", output)
+
     def test_engine_without_bulk_access_raises_command_error(self):
         with patch(
             "django_sql_test.management.commands.analyze_n_plus_one.get_engine", return_value=NoBulkAccessEngine({})

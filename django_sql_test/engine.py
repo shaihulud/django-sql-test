@@ -1,6 +1,7 @@
 import abc
 import json
 import os
+import warnings
 from unittest.util import strclass
 
 from django.test.testcases import TransactionTestCase
@@ -49,10 +50,20 @@ class FileEngine(Engine):
         else:
             with open(self.filename, "r") as f:
                 data = f.read()
-            try:
-                self.data = json.loads(data) or {}
-            except Exception:
+            if not data.strip():
+                # A pristine empty file (e.g. freshly created by tempfile) is "no data yet", not corruption.
                 self.data = {}
+            else:
+                try:
+                    self.data = json.loads(data) or {}
+                except Exception as e:
+                    warnings.warn(
+                        f"django-sql-test: {self.filename} is not valid JSON ({e}); "
+                        "starting with no stored queries. Existing baselines will be "
+                        "overwritten on the next successful assertNumQueries call.",
+                        stacklevel=2,
+                    )
+                    self.data = {}
 
     def get_data_for_testcase(self, testcase: TransactionTestCase, call_index: int = 0) -> list[dict]:
         testcase_name = get_testcase_name(testcase, call_index)

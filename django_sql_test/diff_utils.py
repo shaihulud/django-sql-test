@@ -39,11 +39,17 @@ class ColorScheme:
 
 
 def get_raw_queries(captured_queries: list[dict]) -> list[str]:
-    return [query["sql"] for query in captured_queries]
+    return [query.get("sql") or "" for query in captured_queries]
 
 
 def generalize_queries(captured_queries: list[str]) -> list[str]:
-    return [Generalizator(query).generalize for query in captured_queries]
+    generalized = []
+    for query in captured_queries:
+        try:
+            generalized.append(Generalizator(query).generalize)
+        except Exception:
+            generalized.append(query)  # Fall back to the raw string on parse failure
+    return generalized
 
 
 def build_queries_diff_list(new_captured_queries: list[dict], old_captured_queries: list[dict]) -> list[DiffLine]:
@@ -59,21 +65,21 @@ def build_queries_diff_list(new_captured_queries: list[dict], old_captured_queri
             continue
 
         if diff_line.startswith("-"):
-            original_query = old_captured_queries[old_query_idx]["sql"]
+            original_query = old_captured_queries[old_query_idx].get("sql") or ""
             original_query = f"- {original_query}"
             queries_diff_list.append(
                 DiffLine(diff_type=DiffType.REMOVED, original_query=original_query, generalized_query=diff_line)
             )
             old_query_idx += 1
         elif diff_line.startswith("+"):
-            original_query = new_captured_queries[new_query_idx]["sql"]
+            original_query = new_captured_queries[new_query_idx].get("sql") or ""
             original_query = f"+ {original_query}"
             queries_diff_list.append(
                 DiffLine(diff_type=DiffType.ADDED, original_query=original_query, generalized_query=diff_line)
             )
             new_query_idx += 1
         else:
-            original_query = new_captured_queries[new_query_idx]["sql"]
+            original_query = new_captured_queries[new_query_idx].get("sql") or ""
             original_query = f"  {original_query}"
             queries_diff_list.append(
                 DiffLine(diff_type=DiffType.UNCHANGED, original_query=original_query, generalized_query=diff_line)

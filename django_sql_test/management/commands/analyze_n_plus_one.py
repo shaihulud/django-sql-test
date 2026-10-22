@@ -108,7 +108,7 @@ class Command(BaseCommand):
         if output_format == "json":
             self._output_json(top_problems)
         else:
-            self._output_text(top_problems, detailed)
+            self._output_text(filtered_problems, top_problems, detailed)
 
     def _report_empty(self, message, output_format, success=False):
         """Report an early-exit status. JSON stays machine-parseable; the message always goes to stderr."""
@@ -117,9 +117,16 @@ class Command(BaseCommand):
         style = self.style_success if success else self.style_warning
         self.stderr.write(style(message))
 
-    def _output_text(self, problems, detailed):
-        """Output problems in human-readable text format."""
-        self.stdout.write(self.style_error(f"\nFound {len(problems)} N+1 query problems:\n"))
+    def _output_text(self, all_problems, problems, detailed):
+        """Output problems in human-readable text format.
+
+        all_problems is every problem at/above the severity threshold; problems is the --top-truncated
+        slice actually listed below. The header and Summary report against all_problems so --top doesn't
+        make the output understate how many problems actually exist.
+        """
+        self.stdout.write(self.style_error(f"\nFound {len(all_problems)} N+1 query problems:\n"))
+        if len(problems) < len(all_problems):
+            self.stdout.write(self.style_info(f"(showing top {len(problems)})\n"))
 
         severity_style = {
             Severity.HIGH: self.style_error,
@@ -152,7 +159,7 @@ class Command(BaseCommand):
 
         # Summary
         severity_counts = defaultdict(int)
-        for problem in problems:
+        for problem in all_problems:
             severity_counts[problem.severity] += 1
 
         self.stdout.write("\nSummary:")

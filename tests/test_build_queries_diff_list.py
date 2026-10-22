@@ -244,3 +244,18 @@ class BuildQueriesDiffListTestCase(unittest.TestCase):
         # The generalized query will have column names replaced with column_N
         self.assertIn("column_N", result[1].generalized_query)
         self.assertIn("large_table", result[1].generalized_query)
+
+    def test_null_sql_does_not_crash(self):
+        # A hand-edited/legacy snapshot or a custom Engine can produce an entry with sql=None.
+        result = build_queries_diff_list([{"sql": None}], [])
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].diff_type, DiffType.ADDED)
+        self.assertEqual(result[0].original_query, "+ ")
+
+    def test_missing_sql_key_does_not_crash(self):
+        result = build_queries_diff_list([{"time": "0.01"}], [])
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].diff_type, DiffType.ADDED)
+        self.assertEqual(result[0].original_query, "+ ")
