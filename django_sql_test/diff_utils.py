@@ -27,15 +27,15 @@ class ColorScheme:
     green_color = "\033[1;32m"
     reset = "\033[0m"
 
-    def __init__(self, added: str, removed: str, unchanged: str):
+    def __init__(self, added: Optional[str], removed: Optional[str], unchanged: Optional[str]):
         self.color_map = {
-            DiffType.ADDED: added or self.green_color,
-            DiffType.REMOVED: removed or self.red_color,
-            DiffType.UNCHANGED: unchanged or self.reset,
+            DiffType.ADDED: added if added is not None else self.green_color,
+            DiffType.REMOVED: removed if removed is not None else self.red_color,
+            DiffType.UNCHANGED: unchanged if unchanged is not None else self.reset,
         }
 
     def get_color(self, diff_type: DiffType) -> str:
-        return self.color_map.get(diff_type) or self.reset
+        return self.color_map[diff_type]
 
 
 def get_raw_queries(captured_queries: list[dict]) -> list[str]:

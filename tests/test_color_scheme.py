@@ -23,3 +23,11 @@ class ColorSchemeDefaultsTestCase(unittest.TestCase):
 
         self.assertEqual(color_scheme.get_color(DiffType.ADDED), GREEN)
         self.assertEqual(color_scheme.get_color(DiffType.REMOVED), RED)
+
+    def test_explicit_empty_string_is_honored_not_replaced_with_default(self):
+        # An explicit "" (e.g. to disable ANSI escapes) must be kept as-is, not coerced to the default.
+        color_scheme = ColorScheme(added="", removed="", unchanged="")
+
+        self.assertEqual(color_scheme.get_color(DiffType.ADDED), "")
+        self.assertEqual(color_scheme.get_color(DiffType.REMOVED), "")
+        self.assertEqual(color_scheme.get_color(DiffType.UNCHANGED), "")

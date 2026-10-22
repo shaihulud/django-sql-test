@@ -1,8 +1,11 @@
+import json
 import os
 import tempfile
 import warnings
 from unittest import TestCase
+from unittest.mock import patch
 
+from django_sql_test import engine as engine_module
 from django_sql_test.engine import FileEngine
 
 
@@ -32,3 +35,60 @@ class FileEngineCorruptionTestCase(TestCase):
 
         self.assertEqual(engine.data, {})
         self.assertEqual(len(caught), 0)
+
+
+class GetEngineCachingTestCase(TestCase):
+    """get_engine() must not re-read/re-parse the whole snapshot file on every call."""
+
+    def setUp(self):
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as temp_file:
+            self.temp_filename = temp_file.name
+        os.unlink(self.temp_filename)  # start with no file, like a fresh project
+        self.addCleanup(lambda: os.path.exists(self.temp_filename) and os.unlink(self.temp_filename))
+
+        # get_engine()'s cache is a module-level global; reset it so tests don't leak state into each other.
+        engine_module._engine_instance = None
+        self.addCleanup(setattr, engine_module, "_engine_instance", None)
+
+        self._patches = [
+            patch.object(engine_module, "ENGINE", "file"),
+            patch.object(engine_module, "ENGINE_SETTINGS", {"filename": self.temp_filename}),
+        ]
+        for p in self._patches:
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_returns_the_same_instance_across_calls(self):
+        self.assertIs(engine_module.get_engine(), engine_module.get_engine())
+
+    def test_does_not_pick_up_external_writes_after_first_call(self):
+        engine = engine_module.get_engine()
+
+        with open(self.temp_filename, "w") as f:
+            json.dump({"external.write:0": [{"sql": "SELECT 1"}]}, f)
+
+        # Same cached instance, so the external write made after the first get_engine() call is invisible.
+        self.assertIs(engine_module.get_engine(), engine)
+        self.assertNotIn("external.write:0", engine.data)
+
+    def test_writes_through_cached_instance_still_persist_to_disk(self):
+        class MockTestCase:
+            _testMethodName = "test_method"
+
+            @property
+            def __class__(self):
+                class MockClass:
+                    __module__ = "tests"
+                    __qualname__ = "TestClass"
+
+                return MockClass
+
+        test_case = MockTestCase()
+        engine_module.get_engine().set_data_for_testcase(test_case, [{"sql": "SELECT 1"}], call_index=0)
+        engine_module.get_engine().set_data_for_testcase(test_case, [{"sql": "SELECT 2"}], call_index=1)
+
+        engine = engine_module.get_engine()
+        self.assertEqual(engine.get_data_for_testcase(test_case, call_index=0), [{"sql": "SELECT 1"}])
+        self.assertEqual(engine.get_data_for_testcase(test_case, call_index=1), [{"sql": "SELECT 2"}])
+        with open(self.temp_filename) as f:
+            self.assertEqual(json.load(f), engine.data)

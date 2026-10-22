@@ -2,6 +2,7 @@ import abc
 import json
 import os
 import warnings
+from typing import Optional
 from unittest.util import strclass
 
 from django.test.testcases import TransactionTestCase
@@ -87,11 +88,20 @@ class FileEngine(Engine):
         return self.data
 
 
+_engine_instance: Optional[Engine] = None
+
+
 def get_engine() -> Engine:
+    global _engine_instance
+    if _engine_instance is not None:
+        return _engine_instance
+
     settings = ENGINE_SETTINGS or dict()
 
     if ENGINE == "file":
-        return FileEngine(settings)
+        _engine_instance = FileEngine(settings)
+    else:
+        engine_cls = import_string(ENGINE)
+        _engine_instance = engine_cls(settings)
 
-    engine_cls = import_string(ENGINE)
-    return engine_cls(settings)
+    return _engine_instance
