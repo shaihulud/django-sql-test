@@ -9,7 +9,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils.termcolors import make_style
 
 from django_sql_test.engine import get_engine
-from django_sql_test.n_plus_one import analyze_queries, filter_by_severity, get_suggestions, Severity
+from django_sql_test.n_plus_one import analyze_queries, filter_by_severity, get_suggestions, Severity, truncate_text
 
 
 class Command(BaseCommand):
@@ -139,7 +139,7 @@ class Command(BaseCommand):
             self.stdout.write(f"\n{i}. {style(problem.severity.name)} - {problem}")
             self.stdout.write(f"   Test: {problem.test_case or 'Unknown'}")
 
-            pattern = problem.pattern if detailed or len(problem.pattern) <= 80 else f"{problem.pattern[:77]}..."
+            pattern = problem.pattern if detailed or len(problem.pattern) <= 80 else truncate_text(problem.pattern, 77)
             self.stdout.write(f"   Pattern: {pattern}")
 
             if detailed and problem.similar_queries:

@@ -50,7 +50,7 @@ def _calculate_severity(count: int) -> Severity:
     return Severity.LOW
 
 
-def _truncate(s: str, max_len: int) -> str:
+def truncate_text(s: str, max_len: int) -> str:
     """Truncate string with ellipsis if longer than max_len."""
     return s if len(s) <= max_len else f"{s[:max_len]}..."
 
@@ -175,7 +175,7 @@ def format_problems_text(problems: List[N1Problem], detailed: bool = False) -> s
         if problem.test_case:
             lines.append(f"   Test: {problem.test_case}")
 
-        lines.append(f"   Pattern: {_truncate(problem.pattern, 100)}")
+        lines.append(f"   Pattern: {truncate_text(problem.pattern, 100)}")
 
         if detailed and problem.similar_queries:
             lines.append("   Example queries:")
@@ -186,7 +186,7 @@ def format_problems_text(problems: List[N1Problem], detailed: bool = False) -> s
         elif problem.similar_queries:
             lines.append("   Example queries:")
             for j, query in enumerate(problem.similar_queries[:3], 1):
-                lines.append(f"     {j}. {_truncate(query.get('sql', ''), 80)}")
+                lines.append(f"     {j}. {truncate_text(query.get('sql', ''), 80)}")
             if len(problem.similar_queries) > 3:
                 lines.append(f"     ... and {len(problem.similar_queries) - 3} more similar queries")
 
