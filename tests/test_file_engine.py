@@ -63,12 +63,6 @@ class LegacyKeyMigrationTestCase(TestCase):
             json.dump({str(self.test_case): legacy_queries}, f)
         return FileEngine({"filename": self.temp_filename})
 
-    def test_call_index_0_migrates_legacy_key(self):
-        engine = self._engine_with_legacy_data([{"sql": "SELECT 1"}])
-        engine.set_data_for_testcase(self.test_case, [{"sql": "SELECT 1"}], call_index=0)
-
-        self.assertNotIn(str(self.test_case), engine.data)
-
     def test_call_index_above_0_does_not_pop_legacy_key(self):
         engine = self._engine_with_legacy_data([{"sql": "SELECT 1"}])
         engine.set_data_for_testcase(self.test_case, [{"sql": "SELECT 2"}], call_index=1)

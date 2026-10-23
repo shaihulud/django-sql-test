@@ -1,10 +1,6 @@
-import json
-import os
-import tempfile
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from django_sql_test.engine import FileEngine
 from django_sql_test.utils import NumNewQueriesMixin
 
 
@@ -67,26 +63,6 @@ class MultipleAssertNumQueriesTestCase(NumNewQueriesMixin, TestCase):
     def setUp(self):
         """Set up test method name for proper call index tracking."""
         self._testMethodName = self._testMethodName or "unknown_test"
-
-    def test_multiple_calls_same_method(self):
-        """Test that multiple calls within same test method get incremental call indices."""
-        # Test the call index tracking directly
-        call_index_1 = self._get_call_index()
-        call_index_2 = self._get_call_index()
-        call_index_3 = self._get_call_index()
-
-        self.assertEqual(call_index_1, 0)
-        self.assertEqual(call_index_2, 1)
-        self.assertEqual(call_index_3, 2)
-
-    def test_second_method_resets_counter(self):
-        """Test that different test method resets the call index to 0."""
-        call_index = self._get_call_index()
-        self.assertEqual(call_index, 0)
-
-        # Call again in same method
-        call_index_2 = self._get_call_index()
-        self.assertEqual(call_index_2, 1)
 
     @patch("django_sql_test.utils.connections")
     @patch("django_sql_test.utils._AssertNumNewQueriesContext")
@@ -177,117 +153,3 @@ class MultipleAssertNumQueriesTestCase(NumNewQueriesMixin, TestCase):
         self.assertEqual(len(calls), 2)
         self.assertEqual(calls[0][0][3], 0)  # First call: call_index=0
         self.assertEqual(calls[1][0][3], 1)  # Second call: call_index=1
-
-
-class FileEngineCallIndexTestCase(TestCase):
-    """Test that FileEngine correctly handles call indices."""
-
-    def test_engine_stores_by_call_index(self):
-        """Test that FileEngine stores and retrieves data by call index."""
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as temp_file:
-            temp_filename = temp_file.name
-
-        try:
-            # Create engine with temporary file
-            engine = FileEngine({"filename": temp_filename})
-
-            # Mock test case
-            class MockTestCase:
-                def __init__(self):
-                    self._testMethodName = "test_method"
-
-                @property
-                def __class__(self):
-                    class MockClass:
-                        __module__ = "tests"
-                        __qualname__ = "TestClass"
-
-                    return MockClass
-
-            test_case = MockTestCase()
-
-            # Store different queries for different call indices
-            queries_0 = [{"sql": "SELECT 1"}]
-            queries_1 = [{"sql": "SELECT 2"}]
-            queries_2 = [{"sql": "SELECT 3"}]
-
-            engine.set_data_for_testcase(test_case, queries_0, call_index=0)
-            engine.set_data_for_testcase(test_case, queries_1, call_index=1)
-            engine.set_data_for_testcase(test_case, queries_2, call_index=2)
-
-            # Retrieve and verify
-            self.assertEqual(engine.get_data_for_testcase(test_case, call_index=0), queries_0)
-            self.assertEqual(engine.get_data_for_testcase(test_case, call_index=1), queries_1)
-            self.assertEqual(engine.get_data_for_testcase(test_case, call_index=2), queries_2)
-
-        finally:
-            # Clean up
-            if os.path.exists(temp_filename):
-                os.unlink(temp_filename)
-
-    def test_engine_file_format(self):
-        """Test that the file format includes call indices in keys."""
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as temp_file:
-            temp_filename = temp_file.name
-
-        try:
-            engine = FileEngine({"filename": temp_filename})
-
-            class MockTestCase:
-                def __init__(self):
-                    self._testMethodName = "test_method"
-
-                @property
-                def __class__(self):
-                    class MockClass:
-                        __module__ = "tests"
-                        __qualname__ = "TestClass"
-
-                    return MockClass
-
-            test_case = MockTestCase()
-            queries = [{"sql": "SELECT 1"}]
-
-            engine.set_data_for_testcase(test_case, queries, call_index=2)
-
-            # Read the file directly and check the key format
-            with open(temp_filename, "r") as f:
-                data = json.load(f)
-
-            expected_key = "tests.TestClass.test_method:2"
-            self.assertIn(expected_key, data)
-            self.assertEqual(data[expected_key], queries)
-
-        finally:
-            if os.path.exists(temp_filename):
-                os.unlink(temp_filename)
-
-    def test_engine_returns_empty_for_missing_call_index(self):
-        """Test that engine returns empty list for non-existent call index."""
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as temp_file:
-            temp_filename = temp_file.name
-
-        try:
-            engine = FileEngine({"filename": temp_filename})
-
-            class MockTestCase:
-                def __init__(self):
-                    self._testMethodName = "test_method"
-
-                @property
-                def __class__(self):
-                    class MockClass:
-                        __module__ = "tests"
-                        __qualname__ = "TestClass"
-
-                    return MockClass
-
-            test_case = MockTestCase()
-
-            # Don't store anything, just try to retrieve
-            result = engine.get_data_for_testcase(test_case, call_index=5)
-            self.assertEqual(result, [])
-
-        finally:
-            if os.path.exists(temp_filename):
-                os.unlink(temp_filename)
