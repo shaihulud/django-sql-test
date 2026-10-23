@@ -42,14 +42,15 @@ def get_raw_queries(captured_queries: list[dict]) -> list[str]:
     return [query.get("sql") or "" for query in captured_queries]
 
 
+def generalize_query(sql: str) -> str:
+    try:
+        return Generalizator(sql).generalize
+    except Exception:
+        return sql  # Fall back to the raw string on parse failure
+
+
 def generalize_queries(captured_queries: list[str]) -> list[str]:
-    generalized = []
-    for query in captured_queries:
-        try:
-            generalized.append(Generalizator(query).generalize)
-        except Exception:
-            generalized.append(query)  # Fall back to the raw string on parse failure
-    return generalized
+    return [generalize_query(query) for query in captured_queries]
 
 
 def build_queries_diff_list(new_captured_queries: list[dict], old_captured_queries: list[dict]) -> list[DiffLine]:

@@ -10,7 +10,8 @@ from enum import IntEnum
 from typing import List, Optional, Union
 
 from sql_metadata import Parser
-from sql_metadata.generalizator import Generalizator
+
+from .diff_utils import generalize_query as generalize
 
 
 # sql_metadata generalization placeholders: N (numbers), X/XX (strings, e.g. UUID keys), s (%s-style params).
@@ -69,14 +70,6 @@ class N1Problem:
 
     def __str__(self):
         return f"N+1 Problem: {self.count} similar queries on {self.base_table or 'unknown table'}"
-
-
-def generalize(sql: str) -> str:
-    """Generalize SQL query for pattern matching. Uses sql_metadata."""
-    try:
-        return Generalizator(sql).generalize
-    except Exception:
-        return sql  # Return original on parse failure
 
 
 def get_tables(sql: str) -> List[str]:
@@ -157,6 +150,42 @@ def filter_by_severity(problems: List[N1Problem], threshold: Union[Severity, str
     return [p for p in problems if p.severity >= threshold]
 
 
+def format_problem_body(problem: N1Problem, index: int, detailed: bool = False) -> List[str]:
+    """Format the per-problem detail lines (test, pattern, example queries, suggestions).
+
+    Shared by the inline assertNumQueries warning and the analyze_n_plus_one command, so a
+    change to one doesn't silently drift out of sync with the other.
+    """
+    lines = []
+    if problem.test_case:
+        lines.append(f"   Test: {problem.test_case}")
+
+    pattern = problem.pattern if detailed else truncate_text(problem.pattern, 100)
+    lines.append(f"   Pattern: {pattern}")
+
+    if problem.similar_queries:
+        example_limit = 5 if detailed else 3
+        lines.append("   Example queries:")
+        for j, query in enumerate(problem.similar_queries[:example_limit], 1):
+            sql = query.get("sql", "")
+            if not detailed:
+                sql = truncate_text(sql, 80)
+            lines.append(f"     {j}. {sql}")
+        remaining = len(problem.similar_queries) - example_limit
+        if remaining > 0:
+            lines.append(f"     ... and {remaining} more")
+
+    # Show suggestions for top 3 problems
+    if index <= 3:
+        suggestions = get_suggestions(problem)[:2]
+        if suggestions:
+            lines.append("   Suggestions:")
+            for suggestion in suggestions:
+                lines.append(f"     - {suggestion}")
+
+    return lines
+
+
 def format_problems_text(problems: List[N1Problem], detailed: bool = False) -> str:
     """Format N+1 problems as human-readable text."""
     if not problems:
@@ -172,31 +201,7 @@ def format_problems_text(problems: List[N1Problem], detailed: bool = False) -> s
     for i, problem in enumerate(problems, 1):
         lines.append(f"\n{i}. {problem}")
         lines.append(f"   Severity: {problem.severity.name}")
-        if problem.test_case:
-            lines.append(f"   Test: {problem.test_case}")
-
-        lines.append(f"   Pattern: {truncate_text(problem.pattern, 100)}")
-
-        if detailed and problem.similar_queries:
-            lines.append("   Example queries:")
-            for j, query in enumerate(problem.similar_queries[:5], 1):
-                lines.append(f"     {j}. {query.get('sql', '')}")
-            if len(problem.similar_queries) > 5:
-                lines.append(f"     ... and {len(problem.similar_queries) - 5} more")
-        elif problem.similar_queries:
-            lines.append("   Example queries:")
-            for j, query in enumerate(problem.similar_queries[:3], 1):
-                lines.append(f"     {j}. {truncate_text(query.get('sql', ''), 80)}")
-            if len(problem.similar_queries) > 3:
-                lines.append(f"     ... and {len(problem.similar_queries) - 3} more similar queries")
-
-        # Show suggestions for top 3 problems
-        if i <= 3:
-            suggestions = get_suggestions(problem)[:2]
-            if suggestions:
-                lines.append("   Suggestions:")
-                for suggestion in suggestions:
-                    lines.append(f"     - {suggestion}")
+        lines.extend(format_problem_body(problem, i, detailed))
 
     lines.append("\n" + "=" * 60)
     return "\n".join(lines)

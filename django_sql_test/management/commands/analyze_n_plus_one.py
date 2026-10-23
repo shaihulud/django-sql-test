@@ -9,7 +9,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils.termcolors import make_style
 
 from django_sql_test.engine import get_engine
-from django_sql_test.n_plus_one import analyze_queries, filter_by_severity, get_suggestions, Severity, truncate_text
+from django_sql_test.n_plus_one import analyze_queries, filter_by_severity, format_problem_body, Severity
 
 
 class Command(BaseCommand):
@@ -139,25 +139,8 @@ class Command(BaseCommand):
         for i, problem in enumerate(problems, 1):
             style = severity_style.get(problem.severity, self.style_info)
             self.stdout.write(f"\n{i}. {style(problem.severity.name)} - {problem}")
-            self.stdout.write(f"   Test: {problem.test_case or 'Unknown'}")
-
-            pattern = problem.pattern if detailed or len(problem.pattern) <= 80 else truncate_text(problem.pattern, 77)
-            self.stdout.write(f"   Pattern: {pattern}")
-
-            if detailed and problem.similar_queries:
-                self.stdout.write("   Example queries:")
-                for j, query in enumerate(problem.similar_queries[:5], 1):
-                    self.stdout.write(f"     {j}. {query.get('sql', '')}")
-                if len(problem.similar_queries) > 5:
-                    self.stdout.write(f"     ... and {len(problem.similar_queries) - 5} more")
-
-            # Show suggestions for top 3 problems
-            if i <= 3:
-                suggestions = get_suggestions(problem)[:2]
-                if suggestions:
-                    self.stdout.write("   Suggestions:")
-                    for suggestion in suggestions:
-                        self.stdout.write(f"     - {suggestion}")
+            for line in format_problem_body(problem, i, detailed):
+                self.stdout.write(line)
 
         # Summary
         severity_counts = defaultdict(int)

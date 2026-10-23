@@ -3,6 +3,7 @@ import unittest
 from django_sql_test.n_plus_one import (
     analyze_queries,
     filter_by_severity,
+    format_problem_body,
     format_problems_text,
     generalize,
     get_suggestions,
@@ -259,6 +260,64 @@ class FormatProblemsTextTestCase(unittest.TestCase):
         # The 4th problem's pattern/table still appear, but without a "Suggestions:" block for it.
         fourth_section = text.split("4. ")[1]
         self.assertNotIn("Suggestions:", fourth_section)
+
+
+class FormatProblemBodyTestCase(unittest.TestCase):
+    """format_problem_body is shared by the inline assertNumQueries warning and the management command."""
+
+    def _problem(self, pattern_len=20, num_queries=5):
+        return N1Problem(
+            pattern="SELECT * FROM posts WHERE id = %s" + ("x" * pattern_len),
+            count=num_queries,
+            similar_queries=[{"sql": f"SELECT * FROM posts WHERE id = {i}"} for i in range(num_queries)],
+            base_table="posts",
+            severity=Severity.MEDIUM,
+        )
+
+    def test_not_detailed_truncates_pattern_to_100_chars(self):
+        problem = self._problem(pattern_len=200)
+        lines = format_problem_body(problem, index=1, detailed=False)
+
+        pattern_line = next(line for line in lines if line.startswith("   Pattern:"))
+        self.assertLessEqual(len(pattern_line), len("   Pattern: ") + 100 + len("..."))
+        self.assertIn("...", pattern_line)
+
+    def test_detailed_shows_full_pattern_untruncated(self):
+        problem = self._problem(pattern_len=200)
+        lines = format_problem_body(problem, index=1, detailed=True)
+
+        pattern_line = next(line for line in lines if line.startswith("   Pattern:"))
+        self.assertIn(problem.pattern, pattern_line)
+
+    def test_not_detailed_shows_up_to_3_truncated_examples(self):
+        problem = self._problem(num_queries=5)
+        lines = format_problem_body(problem, index=1, detailed=False)
+
+        self.assertIn("   Example queries:", lines)
+        example_lines = [line for line in lines if line.strip().split(". ", 1)[0].isdigit()]
+        self.assertEqual(len(example_lines), 3)
+        self.assertTrue(any("... and 2 more" in line for line in lines))
+
+    def test_detailed_shows_up_to_5_full_examples(self):
+        problem = self._problem(num_queries=5)
+        lines = format_problem_body(problem, index=1, detailed=True)
+
+        example_lines = [line for line in lines if line.strip().split(". ", 1)[0].isdigit()]
+        self.assertEqual(len(example_lines), 5)
+        self.assertFalse(any("... and" in line for line in lines))
+
+    def test_test_case_line_omitted_when_unset(self):
+        problem = self._problem()
+        lines = format_problem_body(problem, index=1, detailed=False)
+
+        self.assertFalse(any(line.startswith("   Test:") for line in lines))
+
+    def test_test_case_line_shown_when_set(self):
+        problem = self._problem()
+        problem.test_case = "tests.PostsTestCase.test_list:0"
+        lines = format_problem_body(problem, index=1, detailed=False)
+
+        self.assertIn("   Test: tests.PostsTestCase.test_list:0", lines)
 
 
 class SeverityParseTestCase(unittest.TestCase):

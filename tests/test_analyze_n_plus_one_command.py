@@ -106,6 +106,29 @@ class AnalyzeNPlusOneCommandTestCase(TestCase):
         self.assertIn("Medium", output)
         self.assertIn(": 15 problems", output)
 
+    def test_text_output_shows_example_queries_without_detailed(self):
+        engine = self._make_engine_with_n1_data()  # 5 similar queries on "posts"
+
+        stdout = StringIO()
+        with patch("django_sql_test.management.commands.analyze_n_plus_one.get_engine", return_value=engine):
+            call_command("analyze_n_plus_one", stdout=stdout, stderr=StringIO())
+
+        output = stdout.getvalue()
+        self.assertIn("Example queries:", output)
+        self.assertIn("SELECT * FROM posts WHERE user_id = 0", output)
+        self.assertIn("... and 2 more", output)  # 5 queries, only 3 shown
+
+    def test_text_output_shows_full_pattern_and_all_examples_when_detailed(self):
+        engine = self._make_engine_with_n1_data()  # 5 similar queries on "posts"
+
+        stdout = StringIO()
+        with patch("django_sql_test.management.commands.analyze_n_plus_one.get_engine", return_value=engine):
+            call_command("analyze_n_plus_one", "--detailed", stdout=stdout, stderr=StringIO())
+
+        output = stdout.getvalue()
+        self.assertIn("SELECT * FROM posts WHERE user_id = 4", output)  # all 5 examples shown
+        self.assertNotIn("... and", output)
+
     def test_negative_top_raises_command_error(self):
         engine = self._make_engine_with_n1_data()
 
