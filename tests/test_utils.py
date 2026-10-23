@@ -28,7 +28,7 @@ class CreateQueriesDiffTestCase(unittest.TestCase):
         result = diff_builder.build_queries_diff(show_diff_only=False, show_generalized_diff=False)
         self.assertEqual(list(map(str.strip, result.split("\n"))), expected_result)
 
-    def test_empty_old_regular_diff_only_true_hides_context(self):
+    def test_empty_old_regular_diff_only_true_shows_all_as_added(self):
         expected_result = [
             "+ SELECT a.a, a.b, a.c FROM a WHERE a.z = '12' AND a.m IN (1, 2)",
             "+ SELECT b.a, b.b, b.c FROM b LIMIT 21",

@@ -48,6 +48,26 @@ class AnalyzeNPlusOneCommandTestCase(TestCase):
         self.assertEqual(problems[0]["count"], 5)
         self.assertIn("joined_tables", problems[0])
 
+    def test_json_output_detailed_includes_all_example_queries(self):
+        engine = self._make_engine_with_n1_data()  # 5 similar queries
+
+        stdout = StringIO()
+        with patch("django_sql_test.management.commands.analyze_n_plus_one.get_engine", return_value=engine):
+            call_command("analyze_n_plus_one", "--format", "json", "--detailed", stdout=stdout, stderr=StringIO())
+
+        problems = json.loads(stdout.getvalue())
+        self.assertEqual(len(problems[0]["example_queries"]), 5)
+
+    def test_json_output_without_detailed_truncates_example_queries(self):
+        engine = self._make_engine_with_n1_data()  # 5 similar queries
+
+        stdout = StringIO()
+        with patch("django_sql_test.management.commands.analyze_n_plus_one.get_engine", return_value=engine):
+            call_command("analyze_n_plus_one", "--format", "json", stdout=stdout, stderr=StringIO())
+
+        problems = json.loads(stdout.getvalue())
+        self.assertEqual(len(problems[0]["example_queries"]), 3)
+
     def test_json_output_is_empty_array_when_no_data(self):
         with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as temp_file:
             temp_filename = temp_file.name
@@ -85,6 +105,22 @@ class AnalyzeNPlusOneCommandTestCase(TestCase):
         self.assertIn("showing top 10", output)
         self.assertIn("Medium", output)
         self.assertIn(": 15 problems", output)
+
+    def test_negative_top_raises_command_error(self):
+        engine = self._make_engine_with_n1_data()
+
+        with patch("django_sql_test.management.commands.analyze_n_plus_one.get_engine", return_value=engine):
+            with self.assertRaises(CommandError) as ctx:
+                call_command("analyze_n_plus_one", "--top", "-2", stdout=StringIO(), stderr=StringIO())
+
+        self.assertIn("--top", str(ctx.exception))
+
+    def test_zero_top_raises_command_error(self):
+        engine = self._make_engine_with_n1_data()
+
+        with patch("django_sql_test.management.commands.analyze_n_plus_one.get_engine", return_value=engine):
+            with self.assertRaises(CommandError):
+                call_command("analyze_n_plus_one", "--top", "0", stdout=StringIO(), stderr=StringIO())
 
     def test_engine_without_bulk_access_raises_command_error(self):
         with patch(

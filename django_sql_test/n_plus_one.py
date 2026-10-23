@@ -7,7 +7,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 from sql_metadata import Parser
 from sql_metadata.generalizator import Generalizator
@@ -190,11 +190,15 @@ def format_problems_text(problems: List[N1Problem], detailed: bool = False) -> s
             if len(problem.similar_queries) > 3:
                 lines.append(f"     ... and {len(problem.similar_queries) - 3} more similar queries")
 
-    lines.append("\nSUGGESTIONS:")
-    for i, suggestion in enumerate(get_suggestions(problems[0]), 1):
-        lines.append(f"   {i}. {suggestion}")
+        # Show suggestions for top 3 problems
+        if i <= 3:
+            suggestions = get_suggestions(problem)[:2]
+            if suggestions:
+                lines.append("   Suggestions:")
+                for suggestion in suggestions:
+                    lines.append(f"     - {suggestion}")
 
-    lines.append("=" * 60)
+    lines.append("\n" + "=" * 60)
     return "\n".join(lines)
 
 
@@ -205,46 +209,3 @@ def print_problems(problems: List[N1Problem], detailed: bool = False, file=None)
         dest = file or sys.stdout
         dest.write(output)
         dest.write("\n")
-
-
-# Backwards compatibility - deprecated, use module functions directly
-class N1Analyzer:
-    """Deprecated: Use module functions directly (analyze_queries, get_suggestions, etc.)."""
-
-    @staticmethod
-    def normalize_query(sql: str) -> str:
-        return generalize(sql)
-
-    @staticmethod
-    def extract_table_info(sql: str) -> Dict[str, List[str]]:
-        tables = get_tables(sql)
-        return {
-            "tables": tables[:1] if tables else [],
-            "joins": tables[1:] if len(tables) > 1 else [],
-            "where_columns": [],
-        }
-
-    @staticmethod
-    def group_similar_queries(queries: List[dict]) -> Dict[str, List[dict]]:
-        groups: Dict[str, List[dict]] = defaultdict(list)
-        for query in queries:
-            sql = query.get("sql") or ""
-            if not sql:
-                continue
-            tables = get_tables(sql)
-            key = f"{tables[0] if tables else 'unknown'}:{generalize(sql)}"
-            groups[key].append(query)
-        return dict(groups)
-
-    @staticmethod
-    def analyze_queries(queries: List[dict]) -> List[N1Problem]:
-        return analyze_queries(queries)
-
-    @staticmethod
-    def get_suggestions(problem: N1Problem) -> List[str]:
-        return get_suggestions(problem)
-
-
-def analyze_queries_for_n1(queries: List[dict]) -> List[N1Problem]:
-    """Convenience function to analyze queries for N+1 problems."""
-    return analyze_queries(queries)

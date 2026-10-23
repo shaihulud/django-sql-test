@@ -45,6 +45,8 @@ class Command(BaseCommand):
             raise CommandError(str(e))
         test_pattern = options.get("test_pattern")
         top_n = options["top"]
+        if top_n < 1:
+            raise CommandError("--top must be a positive integer")
         detailed = options["detailed"]
         output_format = options["format"]
 
@@ -106,7 +108,7 @@ class Command(BaseCommand):
 
         # Output results
         if output_format == "json":
-            self._output_json(top_problems)
+            self._output_json(top_problems, detailed)
         else:
             self._output_text(filtered_problems, top_problems, detailed)
 
@@ -168,7 +170,7 @@ class Command(BaseCommand):
                 style = severity_style[severity]
                 self.stdout.write(f"   {style(severity.name.capitalize())}: {severity_counts[severity]} problems")
 
-    def _output_json(self, problems):
+    def _output_json(self, problems, detailed=False):
         """Output problems in JSON format."""
         json_data = [
             {
@@ -178,7 +180,9 @@ class Command(BaseCommand):
                 "pattern": problem.pattern,
                 "base_table": problem.base_table,
                 "joined_tables": problem.joined_tables,
-                "example_queries": [q.get("sql", "") for q in problem.similar_queries[:3]],
+                "example_queries": [
+                    q.get("sql", "") for q in (problem.similar_queries if detailed else problem.similar_queries[:3])
+                ],
             }
             for problem in problems
         ]

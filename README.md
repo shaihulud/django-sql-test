@@ -126,11 +126,28 @@ Version 1.0 supports multiple `assertNumQueries` calls per test method, which re
 - **Snapshot file format**: stored queries are now keyed by `<module>.<Class>.<method>:<call_index>` instead of
   `str(testcase)`. The built-in `"file"` engine still reads old-format entries and migrates them to the new format
   automatically on the next successful run, so no action is needed.
+- **`diff_utils` exports removed**: `create_queries_diff` and the module-level `old_color`/`new_color`/
+  `default_color`/`reset_color` constants are gone. Replace them with `QueryDiffBuilder` and `ColorScheme`:
+  ```python
+  from django_sql_test.diff_utils import ColorScheme, QueryDiffBuilder
+
+  color_scheme = ColorScheme(added=new_color, removed=old_color, unchanged=default_color)
+  builder = QueryDiffBuilder(new_captured_queries, old_captured_queries, color_scheme)
+  diff = builder.build_queries_diff(show_diff_only=diff_only, show_generalized_diff=generalized_diff)
+  ```
 
 Note that `call_index` is the position of the `assertNumQueries` call within the test method. Keep the number and
 order of calls per test stable: adding, removing, or conditionally executing a call shifts the indices of all
 subsequent calls, so their snapshots are compared against the wrong baseline until the next successful run
 rewrites them.
+
+`get_engine()` now constructs the engine once per process and caches it, instead of rebuilding it (and re-reading
+the snapshot file) on every `assertNumQueries` call. If you change `SQL_TEST_ENGINE`/`SQL_TEST_ENGINE_SETTINGS`
+mid-run (e.g. via `override_settings`), reset the cache yourself with
+`django_sql_test.engine._engine_instance = None`.
+
+With `SQL_TEST_DIFF_ONLY` enabled, a test with no stored baseline yet (e.g. the first run after adding
+`assertNumQueries`) now shows every captured query as added, instead of printing an empty diff.
 
 ### SQL_TEST_GENERALIZED_DIFF
 

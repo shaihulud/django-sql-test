@@ -3,7 +3,6 @@ import json
 import os
 import warnings
 from typing import Optional
-from unittest.util import strclass
 
 from django.test.testcases import TransactionTestCase
 from django.utils.module_loading import import_string
@@ -12,7 +11,8 @@ from .app_settings import ENGINE, ENGINE_SETTINGS
 
 
 def get_testcase_name(testcase: TransactionTestCase, call_index: int) -> str:
-    class_name = strclass(testcase.__class__)
+    cls = testcase.__class__
+    class_name = f"{cls.__module__}.{cls.__qualname__}"
     method_name = getattr(testcase, "_testMethodName", "unknown_test")
     testcase_name = f"{class_name}.{method_name}:{call_index}"
     return testcase_name
@@ -78,7 +78,8 @@ class FileEngine(Engine):
         self, testcase: TransactionTestCase, captured_queries: list[dict], call_index: int = 0
     ) -> None:
         testcase_name = get_testcase_name(testcase, call_index)
-        self.data.pop(str(testcase), None)  # migrate away the pre-1.0 entry, if any
+        if call_index == 0:
+            self.data.pop(str(testcase), None)  # migrate away the pre-1.0 entry, if any
         self.data[testcase_name] = captured_queries
 
         with open(self.filename, "w") as f:

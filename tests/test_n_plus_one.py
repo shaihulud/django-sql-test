@@ -2,22 +2,18 @@ import unittest
 
 from django_sql_test.n_plus_one import (
     analyze_queries,
-    analyze_queries_for_n1,
     filter_by_severity,
+    format_problems_text,
     generalize,
     get_suggestions,
     get_tables,
-    N1Analyzer,
     N1Problem,
     Severity,
 )
 
 
-class N1AnalyzerTestCase(unittest.TestCase):
+class NPlusOneDetectionTestCase(unittest.TestCase):
     """Test the N+1 query analyzer."""
-
-    def setUp(self):
-        self.analyzer = N1Analyzer()
 
     def test_generalize_query(self):
         """Test query generalization using sql_metadata."""
@@ -38,30 +34,6 @@ class N1AnalyzerTestCase(unittest.TestCase):
 
         self.assertIn("users", tables)
         self.assertIn("posts", tables)
-
-    def test_group_similar_queries(self):
-        """Test grouping of similar queries."""
-        queries = [
-            {"sql": "SELECT * FROM users WHERE id = 1"},
-            {"sql": "SELECT * FROM users WHERE id = 2"},
-            {"sql": "SELECT * FROM posts WHERE id = 1"},
-            {"sql": "SELECT * FROM users WHERE id = 3"},
-        ]
-
-        groups = self.analyzer.group_similar_queries(queries)
-
-        # Should have 2 groups: users queries and posts queries
-        self.assertEqual(len(groups), 2)
-
-        # Find the users group
-        users_group = None
-        for pattern, group_queries in groups.items():
-            if "users" in pattern:
-                users_group = group_queries
-                break
-
-        self.assertIsNotNone(users_group)
-        self.assertEqual(len(users_group), 3)  # 3 users queries
 
     def test_detect_simple_n1_pattern(self):
         """Test detection of simple N+1 pattern."""
@@ -183,20 +155,6 @@ class N1AnalyzerTestCase(unittest.TestCase):
         select_related_found = any("select_related" in s.lower() for s in suggestions)
         self.assertTrue(select_related_found)
 
-    def test_convenience_function(self):
-        """Test the convenience function."""
-        queries = [
-            {"sql": "SELECT * FROM users WHERE id = 1"},
-            {"sql": "SELECT * FROM users WHERE id = 2"},
-            {"sql": "SELECT * FROM users WHERE id = 3"},
-        ]
-
-        problems = analyze_queries_for_n1(queries)
-
-        self.assertIsInstance(problems, list)
-        if problems:
-            self.assertIsInstance(problems[0], N1Problem)
-
     def test_empty_queries_list(self):
         """Test handling of empty queries list."""
         problems = analyze_queries([])
@@ -271,6 +229,36 @@ class N1ProblemTestCase(unittest.TestCase):
 
         str_repr = str(problem)
         self.assertIn("unknown table", str_repr)
+
+
+class FormatProblemsTextTestCase(unittest.TestCase):
+    """format_problems_text must show suggestions for every listed problem, not just the first."""
+
+    def _problem(self, table):
+        return N1Problem(
+            pattern=f"SELECT * FROM {table} WHERE id = %s",
+            count=5,
+            similar_queries=[],
+            base_table=table,
+            severity=Severity.MEDIUM,
+        )
+
+    def test_suggestions_shown_for_each_of_top_3_problems(self):
+        problems = [self._problem("authors"), self._problem("comments"), self._problem("tags")]
+        text = format_problems_text(problems)
+
+        for problem in problems:
+            self.assertIn(get_suggestions(problem)[0], text)
+
+    def test_suggestions_omitted_beyond_top_3_problems(self):
+        problems = [self._problem(t) for t in ("authors", "comments", "tags", "likes")]
+        text = format_problems_text(problems)
+
+        fourth_suggestions = get_suggestions(problems[3])
+        self.assertTrue(fourth_suggestions)
+        # The 4th problem's pattern/table still appear, but without a "Suggestions:" block for it.
+        fourth_section = text.split("4. ")[1]
+        self.assertNotIn("Suggestions:", fourth_section)
 
 
 class SeverityParseTestCase(unittest.TestCase):

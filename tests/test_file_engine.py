@@ -37,6 +37,48 @@ class FileEngineCorruptionTestCase(TestCase):
         self.assertEqual(len(caught), 0)
 
 
+class _MockTestCase:
+    _testMethodName = "test_method"
+
+    @property
+    def __class__(self):
+        class MockClass:
+            __module__ = "tests"
+            __qualname__ = "TestClass"
+
+        return MockClass
+
+
+class LegacyKeyMigrationTestCase(TestCase):
+    """set_data_for_testcase must only migrate the pre-1.0 str(testcase) key on call_index == 0."""
+
+    def setUp(self):
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as temp_file:
+            self.temp_filename = temp_file.name
+        self.addCleanup(os.unlink, self.temp_filename)
+        self.test_case = _MockTestCase()
+
+    def _engine_with_legacy_data(self, legacy_queries):
+        with open(self.temp_filename, "w") as f:
+            json.dump({str(self.test_case): legacy_queries}, f)
+        return FileEngine({"filename": self.temp_filename})
+
+    def test_call_index_0_migrates_legacy_key(self):
+        engine = self._engine_with_legacy_data([{"sql": "SELECT 1"}])
+        engine.set_data_for_testcase(self.test_case, [{"sql": "SELECT 1"}], call_index=0)
+
+        self.assertNotIn(str(self.test_case), engine.data)
+
+    def test_call_index_above_0_does_not_pop_legacy_key(self):
+        engine = self._engine_with_legacy_data([{"sql": "SELECT 1"}])
+        engine.set_data_for_testcase(self.test_case, [{"sql": "SELECT 2"}], call_index=1)
+
+        # call_index=0 never ran this session (e.g. its own assertion failed), so the legacy
+        # baseline must still be there for it to read/migrate on a later successful run.
+        self.assertIn(str(self.test_case), engine.data)
+        self.assertEqual(engine.get_data_for_testcase(self.test_case, call_index=0), [{"sql": "SELECT 1"}])
+
+
 class GetEngineCachingTestCase(TestCase):
     """get_engine() must not re-read/re-parse the whole snapshot file on every call."""
 
@@ -72,18 +114,7 @@ class GetEngineCachingTestCase(TestCase):
         self.assertNotIn("external.write:0", engine.data)
 
     def test_writes_through_cached_instance_still_persist_to_disk(self):
-        class MockTestCase:
-            _testMethodName = "test_method"
-
-            @property
-            def __class__(self):
-                class MockClass:
-                    __module__ = "tests"
-                    __qualname__ = "TestClass"
-
-                return MockClass
-
-        test_case = MockTestCase()
+        test_case = _MockTestCase()
         engine_module.get_engine().set_data_for_testcase(test_case, [{"sql": "SELECT 1"}], call_index=0)
         engine_module.get_engine().set_data_for_testcase(test_case, [{"sql": "SELECT 2"}], call_index=1)
 
