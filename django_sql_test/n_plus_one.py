@@ -164,14 +164,14 @@ def format_problem_body(problem: N1Problem, index: int, detailed: bool = False) 
     lines.append(f"   Pattern: {pattern}")
 
     if problem.similar_queries:
-        example_limit = 5 if detailed else 3
+        examples = problem.similar_queries if detailed else problem.similar_queries[:3]
         lines.append("   Example queries:")
-        for j, query in enumerate(problem.similar_queries[:example_limit], 1):
+        for j, query in enumerate(examples, 1):
             sql = query.get("sql", "")
             if not detailed:
                 sql = truncate_text(sql, 80)
             lines.append(f"     {j}. {sql}")
-        remaining = len(problem.similar_queries) - example_limit
+        remaining = len(problem.similar_queries) - len(examples)
         if remaining > 0:
             lines.append(f"     ... and {remaining} more")
 

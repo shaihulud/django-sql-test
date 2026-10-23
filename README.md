@@ -131,7 +131,8 @@ Version 1.0 supports multiple `assertNumQueries` calls per test method, which re
   ```python
   from django_sql_test.diff_utils import ColorScheme, QueryDiffBuilder
 
-  color_scheme = ColorScheme(added=new_color, removed=old_color, unchanged=default_color)
+  # added/removed/unchanged take ANSI color codes, or None to use ColorScheme's own defaults
+  color_scheme = ColorScheme(added="\033[1;32m", removed="\033[1;31m", unchanged="\033[0m")
   builder = QueryDiffBuilder(new_captured_queries, old_captured_queries, color_scheme)
   diff = builder.build_queries_diff(show_diff_only=diff_only, show_generalized_diff=generalized_diff)
   ```
@@ -142,9 +143,11 @@ subsequent calls, so their snapshots are compared against the wrong baseline unt
 rewrites them.
 
 `get_engine()` now constructs the engine once per process and caches it, instead of rebuilding it (and re-reading
-the snapshot file) on every `assertNumQueries` call. If you change `SQL_TEST_ENGINE`/`SQL_TEST_ENGINE_SETTINGS`
-mid-run (e.g. via `override_settings`), reset the cache yourself with
-`django_sql_test.engine._engine_instance = None`.
+the snapshot file) on every `assertNumQueries` call. Like every `SQL_TEST_*` setting, `SQL_TEST_ENGINE` and
+`SQL_TEST_ENGINE_SETTINGS` are read once when Django starts and were never re-read on later changes (e.g. via
+`override_settings`), even before 1.0 — the new caching doesn't change that. If you need a genuinely different
+engine/settings per test run, start a separate process (e.g. per-worker when using `--parallel`) rather than
+changing settings mid-run.
 
 With `SQL_TEST_DIFF_ONLY` enabled, a test with no stored baseline yet (e.g. the first run after adding
 `assertNumQueries`) now shows every captured query as added, instead of printing an empty diff.
@@ -177,10 +180,15 @@ POTENTIAL N+1 QUERY PROBLEMS DETECTED
 1. N+1 Problem: 5 similar queries on polls_choice
    Severity: MEDIUM
    Pattern: SELECT polls_choice.id FROM polls_choice WHERE polls_choice.question_id = N
+   Example queries:
+     1. SELECT polls_choice.id FROM polls_choice WHERE polls_choice.question_id = 0
+     2. SELECT polls_choice.id FROM polls_choice WHERE polls_choice.question_id = 1
+     3. SELECT polls_choice.id FROM polls_choice WHERE polls_choice.question_id = 2
+     ... and 2 more
+   Suggestions:
+     - Use prefetch_related() to fetch related polls_choice objects in batches
+     - Review if all these queries are necessary
 
-SUGGESTIONS:
-   1. Use prefetch_related() to fetch related polls_choice objects in batches
-   2. Review if all these queries are necessary
 ============================================================
 ```
 

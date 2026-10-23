@@ -298,12 +298,12 @@ class FormatProblemBodyTestCase(unittest.TestCase):
         self.assertEqual(len(example_lines), 3)
         self.assertTrue(any("... and 2 more" in line for line in lines))
 
-    def test_detailed_shows_up_to_5_full_examples(self):
-        problem = self._problem(num_queries=5)
+    def test_detailed_shows_all_full_examples_uncapped(self):
+        problem = self._problem(num_queries=8)
         lines = format_problem_body(problem, index=1, detailed=True)
 
         example_lines = [line for line in lines if line.strip().split(". ", 1)[0].isdigit()]
-        self.assertEqual(len(example_lines), 5)
+        self.assertEqual(len(example_lines), 8)
         self.assertFalse(any("... and" in line for line in lines))
 
     def test_test_case_line_omitted_when_unset(self):

@@ -119,14 +119,21 @@ class AnalyzeNPlusOneCommandTestCase(TestCase):
         self.assertIn("... and 2 more", output)  # 5 queries, only 3 shown
 
     def test_text_output_shows_full_pattern_and_all_examples_when_detailed(self):
-        engine = self._make_engine_with_n1_data()  # 5 similar queries on "posts"
+        # 8 similar queries: more than the old (now-removed) 5-example cap, to catch its reintroduction.
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as temp_file:
+            temp_filename = temp_file.name
+        self.addCleanup(os.unlink, temp_filename)
+        queries = [{"sql": f"SELECT * FROM posts WHERE user_id = {i}"} for i in range(8)]
+        with open(temp_filename, "w") as f:
+            json.dump({"tests.TestClass.test_method:0": queries}, f)
+        engine = FileEngine({"filename": temp_filename})
 
         stdout = StringIO()
         with patch("django_sql_test.management.commands.analyze_n_plus_one.get_engine", return_value=engine):
             call_command("analyze_n_plus_one", "--detailed", stdout=stdout, stderr=StringIO())
 
         output = stdout.getvalue()
-        self.assertIn("SELECT * FROM posts WHERE user_id = 4", output)  # all 5 examples shown
+        self.assertIn("SELECT * FROM posts WHERE user_id = 7", output)  # all 8 examples shown, uncapped
         self.assertNotIn("... and", output)
 
     def test_negative_top_raises_command_error(self):
