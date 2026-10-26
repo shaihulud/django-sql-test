@@ -172,7 +172,8 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-
+.claude/
 .idea
 .django_sql_test_queries
+CLAUDE.md
 Makefile

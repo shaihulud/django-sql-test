@@ -1,0 +1,178 @@
+"""
+Django management command to analyze stored test queries for N+1 problems.
+"""
+
+import json
+from collections import defaultdict
+
+from django.core.management.base import BaseCommand, CommandError
+from django.utils.termcolors import make_style
+
+from django_sql_test.engine import get_engine
+from django_sql_test.n_plus_one import (
+    analyze_queries,
+    filter_by_severity,
+    format_problem_body,
+    Severity,
+    severity_sort_key,
+)
+
+
+class Command(BaseCommand):
+    help = "Analyze stored test queries for N+1 query problems"
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--severity",
+            choices=[s.name.lower() for s in Severity],
+            default="medium",
+            help="Minimum severity level to report (default: medium)",
+        )
+        parser.add_argument(
+            "--test-pattern", type=str, help='Filter tests by pattern (e.g., "test_user" or "UserTestCase")'
+        )
+        parser.add_argument("--top", type=int, default=10, help="Show top N worst problems (default: 10)")
+        parser.add_argument(
+            "--detailed", action="store_true", help="Show detailed analysis including all example queries"
+        )
+        parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format (default: text)")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.style_error = make_style(opts=("bold",), fg="red")
+        self.style_warning = make_style(opts=("bold",), fg="yellow")
+        self.style_success = make_style(opts=("bold",), fg="green")
+        self.style_info = make_style(fg="cyan")
+
+    def handle(self, *args, **options):
+        try:
+            severity_threshold = Severity.parse(options["severity"])
+        except (TypeError, ValueError) as e:
+            raise CommandError(str(e))
+        test_pattern = options.get("test_pattern")
+        top_n = options["top"]
+        if top_n < 1:
+            raise CommandError("--top must be a positive integer")
+        detailed = options["detailed"]
+        output_format = options["format"]
+
+        # Status/diagnostic messages go to stderr so stdout stays parseable when --format json is used.
+        self.stderr.write(self.style_info("Analyzing stored test queries for N+1 problems..."))
+
+        try:
+            engine = get_engine()
+        except Exception as e:
+            raise CommandError(f"Failed to initialize engine: {e}")
+
+        # Get all stored data
+        try:
+            all_data = engine.get_all_data()
+        except NotImplementedError:
+            raise CommandError(
+                f"Engine {engine.__class__.__name__} does not support bulk data access. "
+                "Implement get_all_data() on your engine to use this command."
+            )
+
+        if not all_data:
+            self._report_empty("No test data found. Run some tests first.", output_format)
+            return
+
+        # Filter by test pattern if provided
+        if test_pattern:
+            all_data = {k: v for k, v in all_data.items() if test_pattern.lower() in k.lower()}
+
+        if not all_data:
+            self._report_empty(f"No test data matches pattern '{test_pattern}'", output_format)
+            return
+
+        # Analyze each test case
+        all_problems = []
+        for test_key, queries in all_data.items():
+            if not queries:
+                continue
+            for problem in analyze_queries(queries):
+                problem.test_case = test_key
+                all_problems.append(problem)
+
+        if not all_problems:
+            self._report_empty("No N+1 problems detected!", output_format, success=True)
+            return
+
+        # Filter by severity and sort
+        filtered_problems = filter_by_severity(all_problems, severity_threshold)
+
+        if not filtered_problems:
+            self._report_empty(
+                f"No N+1 problems found at '{severity_threshold.name.lower()}' severity or higher!",
+                output_format,
+                success=True,
+            )
+            return
+
+        filtered_problems.sort(key=severity_sort_key, reverse=True)
+        top_problems = filtered_problems[:top_n]
+
+        # Output results
+        if output_format == "json":
+            self._output_json(top_problems, detailed)
+        else:
+            self._output_text(filtered_problems, top_problems, detailed)
+
+    def _report_empty(self, message, output_format, success=False):
+        """Report an early-exit status. JSON stays machine-parseable; the message always goes to stderr."""
+        if output_format == "json":
+            self.stdout.write("[]")
+        style = self.style_success if success else self.style_warning
+        self.stderr.write(style(message))
+
+    def _output_text(self, all_problems, problems, detailed):
+        """Output problems in human-readable text format.
+
+        all_problems is every problem at/above the severity threshold; problems is the --top-truncated
+        slice actually listed below. The header and Summary report against all_problems so --top doesn't
+        make the output understate how many problems actually exist.
+        """
+        self.stdout.write(self.style_error(f"\nFound {len(all_problems)} N+1 query problems:\n"))
+        if len(problems) < len(all_problems):
+            self.stdout.write(self.style_info(f"(showing top {len(problems)})\n"))
+
+        severity_style = {
+            Severity.HIGH: self.style_error,
+            Severity.MEDIUM: self.style_warning,
+            Severity.LOW: self.style_info,
+        }
+
+        for i, problem in enumerate(problems, 1):
+            style = severity_style.get(problem.severity, self.style_info)
+            self.stdout.write(f"\n{i}. {style(problem.severity.name)} - {problem}")
+            for line in format_problem_body(problem, i, detailed):
+                self.stdout.write(line)
+
+        # Summary
+        severity_counts = defaultdict(int)
+        for problem in all_problems:
+            severity_counts[problem.severity] += 1
+
+        self.stdout.write("\nSummary:")
+        for severity in (Severity.HIGH, Severity.MEDIUM, Severity.LOW):
+            if severity_counts[severity]:
+                style = severity_style[severity]
+                self.stdout.write(f"   {style(severity.name.capitalize())}: {severity_counts[severity]} problems")
+
+    def _output_json(self, problems, detailed=False):
+        """Output problems in JSON format."""
+        json_data = [
+            {
+                "test_case": problem.test_case or "Unknown",
+                "severity": problem.severity.name.lower(),
+                "count": problem.count,
+                "pattern": problem.pattern,
+                "base_table": problem.base_table,
+                "joined_tables": problem.joined_tables,
+                "example_queries": [
+                    q.get("sql", "") for q in (problem.similar_queries if detailed else problem.similar_queries[:3])
+                ],
+            }
+            for problem in problems
+        ]
+        self.stdout.write(json.dumps(json_data, indent=2))

@@ -1,6 +1,8 @@
 import abc
 import json
 import os
+import warnings
+from typing import Optional
 
 from django.test.testcases import TransactionTestCase
 from django.utils.module_loading import import_string
@@ -8,15 +10,32 @@ from django.utils.module_loading import import_string
 from .app_settings import ENGINE, ENGINE_SETTINGS
 
 
+def get_testcase_name(testcase: TransactionTestCase, call_index: int) -> str:
+    cls = testcase.__class__
+    class_name = f"{cls.__module__}.{cls.__qualname__}"
+    method_name = getattr(testcase, "_testMethodName", "unknown_test")
+    testcase_name = f"{class_name}.{method_name}:{call_index}"
+    return testcase_name
+
+
 class Engine(abc.ABC):
     def __init__(self, settings: dict):
         self.settings = settings or {}
 
     @abc.abstractmethod
-    def get_data_for_testcase(self, testcase: TransactionTestCase) -> list[dict]: ...
+    def get_data_for_testcase(self, testcase: TransactionTestCase, call_index: int = 0) -> list[dict]: ...
 
     @abc.abstractmethod
-    def set_data_for_testcase(self, testcase: TransactionTestCase, captured_queries: list[dict]) -> None: ...
+    def set_data_for_testcase(
+        self, testcase: TransactionTestCase, captured_queries: list[dict], call_index: int = 0
+    ) -> None: ...
+
+    def get_all_data(self) -> dict:
+        """
+        Return all stored queries as {testcase_name: captured_queries}.
+        Only needed by the analyze_n_plus_one management command.
+        """
+        raise NotImplementedError
 
 
 class FileEngine(Engine):
@@ -24,36 +43,73 @@ class FileEngine(Engine):
         super().__init__(*args, **kwargs)
 
         self.filename = self.settings.get("filename") or ".django_sql_test_queries"
+        self.data = self._load_data()
 
+    def _load_data(self) -> dict:
         if not os.path.exists(self.filename):
             with open(self.filename, "w") as f:
                 f.write("{}")
-            self.data = {}
-        else:
-            with open(self.filename, "r") as f:
-                data = f.read()
-            try:
-                self.data = json.loads(data) or {}
-            except Exception:
-                self.data = {}
+            return {}
 
-    def get_data_for_testcase(self, testcase: TransactionTestCase) -> list[dict]:
-        testcase_name = str(testcase)
-        return self.data.get(testcase_name) or []
+        with open(self.filename, "r") as f:
+            data = f.read()
+        if not data.strip():
+            # A pristine empty file (e.g. freshly created by tempfile) is "no data yet", not corruption.
+            return {}
 
-    def set_data_for_testcase(self, testcase: TransactionTestCase, captured_queries: list[dict]) -> None:
-        testcase_name = str(testcase)
+        try:
+            return json.loads(data) or {}
+        except Exception as e:
+            warnings.warn(
+                f"django-sql-test: {self.filename} is not valid JSON ({e}); "
+                "starting with no stored queries. Existing baselines will be "
+                "overwritten on the next successful assertNumQueries call.",
+                stacklevel=2,
+            )
+            return {}
+
+    def get_data_for_testcase(self, testcase: TransactionTestCase, call_index: int = 0) -> list[dict]:
+        testcase_name = get_testcase_name(testcase, call_index)
+        data = self.data.get(testcase_name)
+        if data is None and call_index == 0:
+            # Snapshots written before 1.0 are keyed by str(testcase) and have no call_index
+            data = self.data.get(str(testcase))
+        return data or []
+
+    def set_data_for_testcase(
+        self, testcase: TransactionTestCase, captured_queries: list[dict], call_index: int = 0
+    ) -> None:
+        testcase_name = get_testcase_name(testcase, call_index)
+
+        # get_engine() caches this instance for the whole process, but other processes (e.g. Django
+        # --parallel workers) may share this file and write to it in the meantime. Re-read right before
+        # writing so a save here never clobbers their updates with our now-possibly-stale copy.
+        self.data = self._load_data()
+        if call_index == 0:
+            self.data.pop(str(testcase), None)  # migrate away the pre-1.0 entry, if any
         self.data[testcase_name] = captured_queries
 
         with open(self.filename, "w") as f:
             f.write(json.dumps(self.data))
 
+    def get_all_data(self) -> dict:
+        return self.data
+
+
+_engine_instance: Optional[Engine] = None
+
 
 def get_engine() -> Engine:
+    global _engine_instance
+    if _engine_instance is not None:
+        return _engine_instance
+
     settings = ENGINE_SETTINGS or dict()
 
     if ENGINE == "file":
-        return FileEngine(settings)
+        _engine_instance = FileEngine(settings)
+    else:
+        engine_cls = import_string(ENGINE)
+        _engine_instance = engine_cls(settings)
 
-    engine_cls = import_string(ENGINE)
-    return engine_cls(settings)
+    return _engine_instance

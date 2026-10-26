@@ -1,15 +1,36 @@
+import sys
+
 from django.db import connections, DEFAULT_DB_ALIAS
 from django.test.utils import CaptureQueriesContext
 
-from .app_settings import DIFF_ONLY, GENERALIZED_DIFF
-from .diff_utils import create_queries_diff
+from .app_settings import (
+    DETECT_N_PLUS_ONE,
+    DIFF_DEFAULT_COLOR,
+    DIFF_NEW_COLOR,
+    DIFF_OLD_COLOR,
+    DIFF_ONLY,
+    GENERALIZED_DIFF,
+    N_PLUS_ONE_SEVERITY_THRESHOLD,
+    SHOW_UPDATED_QUERIES,
+)
+from .diff_utils import ColorScheme, QueryDiffBuilder
 from .engine import get_engine
+from .n_plus_one import analyze_queries, filter_by_severity, print_problems, Severity
+
+
+color_scheme = ColorScheme(added=DIFF_NEW_COLOR, removed=DIFF_OLD_COLOR, unchanged=DIFF_DEFAULT_COLOR)
+
+if DETECT_N_PLUS_ONE:
+    # Only validated when the feature is actually on: fail fast on an invalid threshold, but don't block
+    # startup over a stale/typo'd setting that's never going to be read while detection is disabled.
+    N_PLUS_ONE_SEVERITY_THRESHOLD = Severity.parse(N_PLUS_ONE_SEVERITY_THRESHOLD)
 
 
 class _AssertNumNewQueriesContext(CaptureQueriesContext):
-    def __init__(self, test_case, num, connection):
+    def __init__(self, test_case, num, connection, call_index):
         self.test_case = test_case
         self.num = num
+        self.call_index = call_index
         super().__init__(connection)
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -20,23 +41,62 @@ class _AssertNumNewQueriesContext(CaptureQueriesContext):
         executed = len(self)
         engine = get_engine()
 
+        # Analyze for N+1 problems if enabled - same call regardless of whether the count matched.
+        if DETECT_N_PLUS_ONE:
+            self._analyze_n_plus_one(self.captured_queries)
+
         if executed == self.num:
-            engine.set_data_for_testcase(self.test_case, self.captured_queries)
+            if SHOW_UPDATED_QUERIES:
+                old_captured_queries = engine.get_data_for_testcase(self.test_case, self.call_index)
+                builder = QueryDiffBuilder(self.captured_queries, old_captured_queries, color_scheme)
+
+                if not builder.is_same:
+                    queries_diff = builder.build_queries_diff(DIFF_ONLY, GENERALIZED_DIFF)
+                    sys.stdout.write(
+                        f"executed queries number is the same, but queries differ\nQueries diff:\n{queries_diff}\n"
+                    )
+
+            engine.set_data_for_testcase(self.test_case, self.captured_queries, self.call_index)
         else:
-            old_captured_queries = engine.get_data_for_testcase(self.test_case)
-            queries_diff = create_queries_diff(self.captured_queries, old_captured_queries, DIFF_ONLY, GENERALIZED_DIFF)
+            old_captured_queries = engine.get_data_for_testcase(self.test_case, self.call_index)
+            builder = QueryDiffBuilder(self.captured_queries, old_captured_queries, color_scheme)
+            queries_diff = builder.build_queries_diff(DIFF_ONLY, GENERALIZED_DIFF)
+
             self.test_case.assertEqual(
                 executed,
                 self.num,
                 "%d queries executed, %d expected\nQueries diff:\n%s" % (executed, self.num, queries_diff),
             )
 
+    @staticmethod
+    def _analyze_n_plus_one(captured_queries):
+        """Analyze queries for N+1 problems and output warnings."""
+        problems = filter_by_severity(analyze_queries(captured_queries), N_PLUS_ONE_SEVERITY_THRESHOLD)
+        if problems:
+            print_problems(problems)
+
 
 class NumNewQueriesMixin:
+    def _get_call_index(self):
+        current_test_method = getattr(self, "_testMethodName", "unknown_test")
+
+        if not hasattr(self, "_query_call_data"):
+            self._query_call_data = {"current_method": current_test_method, "counter": 0}
+
+        if self._query_call_data["current_method"] != current_test_method:
+            self._query_call_data["current_method"] = current_test_method
+            self._query_call_data["counter"] = 0
+
+        call_index = self._query_call_data["counter"]
+        self._query_call_data["counter"] += 1
+
+        return call_index
+
     def assertNumQueries(self, num, func=None, *args, using=DEFAULT_DB_ALIAS, **kwargs):
         conn = connections[using]
+        call_index = self._get_call_index()
 
-        context = _AssertNumNewQueriesContext(self, num, conn)
+        context = _AssertNumNewQueriesContext(self, num, conn, call_index)
         if func is None:
             return context
 
