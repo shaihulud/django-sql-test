@@ -19,6 +19,11 @@ from .diff_utils import generalize_query as generalize
 # prefetch_related batches, i.e. the fix for N+1 rather than the problem.
 PARAM_PLACEHOLDER = re.compile(r"= (?:N|X+|s)\b")
 
+# \b avoids matching "WHERE" inside an unrelated identifier (e.g. a table named "app_nowhere"); the
+# non-greedy capture stops at the next clause keyword (or end of string) so PARAM_PLACEHOLDER below is
+# checked only against the actual WHERE clause, not an unrelated JOIN/ON condition before it.
+WHERE_CLAUSE = re.compile(r"\bWHERE\b(.*?)(?:\bGROUP BY\b|\bORDER BY\b|\bLIMIT\b|$)", re.IGNORECASE | re.DOTALL)
+
 
 class Severity(IntEnum):
     LOW = 1
@@ -85,7 +90,7 @@ def analyze_queries(queries: List[dict]) -> List[N1Problem]:
     if not queries:
         return []
 
-    # Group queries by generalized pattern
+    # Group queries by (first table, generalized pattern) to separate different tables
     groups = defaultdict(list)
     for query in queries:
         sql = query.get("sql") or ""
@@ -93,13 +98,12 @@ def analyze_queries(queries: List[dict]) -> List[N1Problem]:
             continue
         tables = get_tables(sql)
         pattern = generalize(sql)
-        # Use first table + pattern as key to separate different tables
-        key = f"{tables[0] if tables else 'unknown'}:{pattern}"
-        groups[key].append({"sql": sql, "tables": tables})
+        base_table = tables[0] if tables else None
+        groups[(base_table, pattern)].append({"sql": sql, "tables": tables})
 
     # Detect N+1 patterns
     problems = []
-    for group_key, group_queries in groups.items():
+    for (base_table, pattern), group_queries in groups.items():
         if len(group_queries) < 2:
             continue
 
@@ -107,12 +111,9 @@ def analyze_queries(queries: List[dict]) -> List[N1Problem]:
         if len(set(q["sql"] for q in group_queries)) == 1:
             continue
 
-        base_table, pattern = group_key.split(":", 1)
-        if base_table == "unknown":
-            base_table = None
-
         # N+1 indicator: WHERE clause with a parameter placeholder (typical FK lookup)
-        if "WHERE" not in pattern.upper() or not PARAM_PLACEHOLDER.search(pattern):
+        where_match = WHERE_CLAUSE.search(pattern)
+        if where_match is None or not PARAM_PLACEHOLDER.search(where_match.group(1)):
             continue
 
         count = len(group_queries)
@@ -123,13 +124,17 @@ def analyze_queries(queries: List[dict]) -> List[N1Problem]:
                 count=count,
                 similar_queries=[{"sql": q["sql"]} for q in group_queries],
                 base_table=base_table,
-                joined_tables=tables[1:] if len(tables) > 1 else None,
+                joined_tables=tables[1:] or None,
                 severity=_calculate_severity(count),
             )
         )
 
-    problems.sort(key=lambda p: (p.severity, p.count), reverse=True)
+    problems.sort(key=severity_sort_key, reverse=True)
     return problems
+
+
+def severity_sort_key(problem: N1Problem) -> tuple:
+    return (problem.severity, problem.count)
 
 
 def get_suggestions(problem: N1Problem) -> List[str]:

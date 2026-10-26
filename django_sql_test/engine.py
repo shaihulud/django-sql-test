@@ -43,28 +43,30 @@ class FileEngine(Engine):
         super().__init__(*args, **kwargs)
 
         self.filename = self.settings.get("filename") or ".django_sql_test_queries"
+        self.data = self._load_data()
 
+    def _load_data(self) -> dict:
         if not os.path.exists(self.filename):
             with open(self.filename, "w") as f:
                 f.write("{}")
-            self.data = {}
-        else:
-            with open(self.filename, "r") as f:
-                data = f.read()
-            if not data.strip():
-                # A pristine empty file (e.g. freshly created by tempfile) is "no data yet", not corruption.
-                self.data = {}
-            else:
-                try:
-                    self.data = json.loads(data) or {}
-                except Exception as e:
-                    warnings.warn(
-                        f"django-sql-test: {self.filename} is not valid JSON ({e}); "
-                        "starting with no stored queries. Existing baselines will be "
-                        "overwritten on the next successful assertNumQueries call.",
-                        stacklevel=2,
-                    )
-                    self.data = {}
+            return {}
+
+        with open(self.filename, "r") as f:
+            data = f.read()
+        if not data.strip():
+            # A pristine empty file (e.g. freshly created by tempfile) is "no data yet", not corruption.
+            return {}
+
+        try:
+            return json.loads(data) or {}
+        except Exception as e:
+            warnings.warn(
+                f"django-sql-test: {self.filename} is not valid JSON ({e}); "
+                "starting with no stored queries. Existing baselines will be "
+                "overwritten on the next successful assertNumQueries call.",
+                stacklevel=2,
+            )
+            return {}
 
     def get_data_for_testcase(self, testcase: TransactionTestCase, call_index: int = 0) -> list[dict]:
         testcase_name = get_testcase_name(testcase, call_index)
@@ -78,6 +80,11 @@ class FileEngine(Engine):
         self, testcase: TransactionTestCase, captured_queries: list[dict], call_index: int = 0
     ) -> None:
         testcase_name = get_testcase_name(testcase, call_index)
+
+        # get_engine() caches this instance for the whole process, but other processes (e.g. Django
+        # --parallel workers) may share this file and write to it in the meantime. Re-read right before
+        # writing so a save here never clobbers their updates with our now-possibly-stale copy.
+        self.data = self._load_data()
         if call_index == 0:
             self.data.pop(str(testcase), None)  # migrate away the pre-1.0 entry, if any
         self.data[testcase_name] = captured_queries

@@ -143,10 +143,13 @@ subsequent calls, so their snapshots are compared against the wrong baseline unt
 rewrites them.
 
 `get_engine()` now constructs the engine once per process and caches it, instead of rebuilding it (and re-reading
-the snapshot file) on every `assertNumQueries` call. Like every `SQL_TEST_*` setting, `SQL_TEST_ENGINE` and
-`SQL_TEST_ENGINE_SETTINGS` are read once when Django starts and were never re-read on later changes (e.g. via
-`override_settings`), even before 1.0 — the new caching doesn't change that. If you need a genuinely different
-engine/settings per test run, start a separate process (e.g. per-worker when using `--parallel`) rather than
+the snapshot file) on every `assertNumQueries` call. The built-in `"file"` engine still re-reads the file fresh
+immediately before every write, so multiple processes sharing one snapshot file (e.g. Django `--parallel` workers)
+won't clobber each other's results — only reads are served from the in-process cache.
+
+Like every `SQL_TEST_*` setting, `SQL_TEST_ENGINE` and `SQL_TEST_ENGINE_SETTINGS` are read once when Django starts
+and were never re-read on later changes (e.g. via `override_settings`), even before 1.0 — the new caching doesn't
+change that. If you need a genuinely different engine/settings per test run, start a separate process rather than
 changing settings mid-run.
 
 With `SQL_TEST_DIFF_ONLY` enabled, a test with no stored baseline yet (e.g. the first run after adding

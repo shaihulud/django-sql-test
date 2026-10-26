@@ -65,28 +65,19 @@ def build_queries_diff_list(new_captured_queries: list[dict], old_captured_queri
         if diff_line.startswith("?"):
             continue
 
-        if diff_line.startswith("-"):
-            original_query = old_captured_queries[old_query_idx].get("sql") or ""
-            original_query = f"- {original_query}"
-            queries_diff_list.append(
-                DiffLine(diff_type=DiffType.REMOVED, original_query=original_query, generalized_query=diff_line)
-            )
+        diff_type = DiffType(diff_line[0])
+        if diff_type == DiffType.REMOVED:
+            sql = old_captured_queries[old_query_idx].get("sql") or ""
             old_query_idx += 1
-        elif diff_line.startswith("+"):
-            original_query = new_captured_queries[new_query_idx].get("sql") or ""
-            original_query = f"+ {original_query}"
-            queries_diff_list.append(
-                DiffLine(diff_type=DiffType.ADDED, original_query=original_query, generalized_query=diff_line)
-            )
-            new_query_idx += 1
         else:
-            original_query = new_captured_queries[new_query_idx].get("sql") or ""
-            original_query = f"  {original_query}"
-            queries_diff_list.append(
-                DiffLine(diff_type=DiffType.UNCHANGED, original_query=original_query, generalized_query=diff_line)
-            )
+            sql = new_captured_queries[new_query_idx].get("sql") or ""
             new_query_idx += 1
-            old_query_idx += 1
+            if diff_type == DiffType.UNCHANGED:
+                old_query_idx += 1
+
+        queries_diff_list.append(
+            DiffLine(diff_type=diff_type, original_query=f"{diff_type.value} {sql}", generalized_query=diff_line)
+        )
 
     return queries_diff_list
 

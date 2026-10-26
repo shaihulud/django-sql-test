@@ -75,20 +75,20 @@ class NPlusOneDetectionTestCase(unittest.TestCase):
         # Low severity (< 5 queries)
         low_queries = [{"sql": f"SELECT * FROM users WHERE id = {i}"} for i in range(1, 4)]
         low_problems = analyze_queries(low_queries)
-        if low_problems:
-            self.assertEqual(low_problems[0].severity, Severity.LOW)
+        self.assertEqual(len(low_problems), 1)
+        self.assertEqual(low_problems[0].severity, Severity.LOW)
 
         # Medium severity (5-9 queries)
         medium_queries = [{"sql": f"SELECT * FROM users WHERE id = {i}"} for i in range(1, 8)]
         medium_problems = analyze_queries(medium_queries)
-        if medium_problems:
-            self.assertEqual(medium_problems[0].severity, Severity.MEDIUM)
+        self.assertEqual(len(medium_problems), 1)
+        self.assertEqual(medium_problems[0].severity, Severity.MEDIUM)
 
         # High severity (10+ queries)
         high_queries = [{"sql": f"SELECT * FROM users WHERE id = {i}"} for i in range(1, 12)]
         high_problems = analyze_queries(high_queries)
-        if high_problems:
-            self.assertEqual(high_problems[0].severity, Severity.HIGH)
+        self.assertEqual(len(high_problems), 1)
+        self.assertEqual(high_problems[0].severity, Severity.HIGH)
 
     def test_detect_n1_with_string_parameters(self):
         """Test detection of N+1 pattern with non-numeric (UUID/string) keys."""
@@ -115,6 +115,42 @@ class NPlusOneDetectionTestCase(unittest.TestCase):
 
         # Should not detect this as N+1 since it's the same exact query
         self.assertEqual(len(problems), 0)
+
+    def test_placeholder_in_join_on_clause_is_not_mistaken_for_where_parameter(self):
+        # The varying literal is in the WHERE clause's `>` comparison (not detected as a
+        # placeholder by design); a static JOIN...ON alias comparison must not cause a false match.
+        queries = [
+            {
+                "sql": (
+                    "SELECT p.id FROM posts p JOIN sessions s ON p.id = s.post_id "
+                    f"WHERE p.created_at > '2024-01-0{i}'"
+                )
+            }
+            for i in range(1, 6)
+        ]
+
+        problems = analyze_queries(queries)
+
+        self.assertEqual(len(problems), 0)
+
+    def test_table_name_containing_where_substring_is_not_mistaken_for_where_clause(self):
+        # "app_nowhere" contains the substring "where" but has no real WHERE clause.
+        queries = [
+            {"sql": f"SELECT CASE WHEN status = {i} THEN 'a' ELSE 'b' END AS s FROM app_nowhere LIMIT 10"}
+            for i in range(5)
+        ]
+
+        problems = analyze_queries(queries)
+
+        self.assertEqual(len(problems), 0)
+
+    def test_table_literally_named_unknown_keeps_its_real_name(self):
+        queries = [{"sql": f"SELECT * FROM unknown WHERE id = {i}"} for i in range(5)]
+
+        problems = analyze_queries(queries)
+
+        self.assertEqual(len(problems), 1)
+        self.assertEqual(problems[0].base_table, "unknown")
 
     def test_mixed_queries_detection(self):
         """Test detection with mixed query types."""

@@ -107,6 +107,22 @@ class GetEngineCachingTestCase(TestCase):
         self.assertIs(engine_module.get_engine(), engine)
         self.assertNotIn("external.write:0", engine.data)
 
+    def test_set_data_does_not_clobber_external_writes_made_since_caching(self):
+        # Simulates another process (e.g. a Django --parallel worker) sharing this file and
+        # writing to it after this engine was cached.
+        engine = engine_module.get_engine()
+
+        with open(self.temp_filename, "w") as f:
+            json.dump({"external.write:0": [{"sql": "SELECT 1"}]}, f)
+
+        test_case = _MockTestCase()
+        engine.set_data_for_testcase(test_case, [{"sql": "SELECT 2"}], call_index=0)
+
+        with open(self.temp_filename) as f:
+            data = json.load(f)
+        self.assertIn("external.write:0", data)  # not clobbered by this engine's stale in-memory copy
+        self.assertIn("tests.TestClass.test_method:0", data)
+
     def test_writes_through_cached_instance_still_persist_to_disk(self):
         test_case = _MockTestCase()
         engine_module.get_engine().set_data_for_testcase(test_case, [{"sql": "SELECT 1"}], call_index=0)

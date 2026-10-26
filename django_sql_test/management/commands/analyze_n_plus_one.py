@@ -9,7 +9,13 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils.termcolors import make_style
 
 from django_sql_test.engine import get_engine
-from django_sql_test.n_plus_one import analyze_queries, filter_by_severity, format_problem_body, Severity
+from django_sql_test.n_plus_one import (
+    analyze_queries,
+    filter_by_severity,
+    format_problem_body,
+    Severity,
+    severity_sort_key,
+)
 
 
 class Command(BaseCommand):
@@ -18,7 +24,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--severity",
-            choices=["low", "medium", "high"],
+            choices=[s.name.lower() for s in Severity],
             default="medium",
             help="Minimum severity level to report (default: medium)",
         )
@@ -103,7 +109,7 @@ class Command(BaseCommand):
             )
             return
 
-        filtered_problems.sort(key=lambda p: (p.severity, p.count), reverse=True)
+        filtered_problems.sort(key=severity_sort_key, reverse=True)
         top_problems = filtered_problems[:top_n]
 
         # Output results
